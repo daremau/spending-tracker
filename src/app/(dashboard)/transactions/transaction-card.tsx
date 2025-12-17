@@ -58,9 +58,11 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
   }
 
   const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("es-PY", {
       style: "currency",
-      currency: currency,
+      currency,
+      minimumFractionDigits: currency === "PYG" ? 0 : 2,
+      maximumFractionDigits: currency === "PYG" ? 0 : 2,
     }).format(amount);
   };
 

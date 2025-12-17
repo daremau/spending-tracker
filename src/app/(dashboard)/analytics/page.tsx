@@ -95,9 +95,11 @@ export default async function AnalyticsPage() {
     await getAnalyticsData();
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("es-PY", {
       style: "currency",
-      currency: "USD",
+      currency: "PYG",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 

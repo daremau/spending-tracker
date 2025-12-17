@@ -22,7 +22,7 @@ import {
 import { Plus } from "lucide-react";
 import { createAccount } from "@/actions/accounts";
 
-const currencies = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "MXN"];
+const currencies = ["PYG", "USD", "EUR", "GBP", "BRL", "ARS"];
 
 export function AccountForm() {
   const [open, setOpen] = useState(false);
@@ -88,7 +88,7 @@ export function AccountForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="currency">Currency</Label>
-            <Select name="currency" defaultValue="USD">
+            <Select name="currency" defaultValue="PYG">
               <SelectTrigger>
                 <SelectValue placeholder="Select currency" />
               </SelectTrigger>

@@ -38,10 +38,12 @@ export default async function DashboardPage() {
     .filter((t) => t.type === "EXPENSE")
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const formatCurrency = (amount: number, currency = "PYG") => {
+    return new Intl.NumberFormat("es-PY", {
       style: "currency",
-      currency: "USD",
+      currency,
+      minimumFractionDigits: currency === "PYG" ? 0 : 2,
+      maximumFractionDigits: currency === "PYG" ? 0 : 2,
     }).format(amount);
   };
 

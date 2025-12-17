@@ -11,7 +11,7 @@ model BankAccount {
   id                  String        @id @default(cuid())
   name                String
   balance             Decimal       @default(0) @db.Decimal(12, 2)
-  currency            String        @default("USD")
+  currency            String        @default("PYG")
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   transactions        Transaction[] @relation("AccountTransactions")

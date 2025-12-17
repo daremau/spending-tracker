@@ -48,9 +48,11 @@ export function SpendingChart({ data }: SpendingChartProps) {
         </Pie>
         <Tooltip
           formatter={(value) =>
-            new Intl.NumberFormat("en-US", {
+            new Intl.NumberFormat("es-PY", {
               style: "currency",
-              currency: "USD",
+              currency: "PYG",
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
             }).format(Number(value))
           }
         />
