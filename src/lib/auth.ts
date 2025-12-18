@@ -9,7 +9,7 @@ export const authOptions: NextAuthOptions = {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials: Record<"username" | "password", string> | undefined) {
         const username = credentials?.username ?? "";
         const password = credentials?.password ?? "";
         const expectedUsername = process.env.AUTH_USERNAME;
