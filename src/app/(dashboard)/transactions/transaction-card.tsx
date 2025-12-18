@@ -14,11 +14,14 @@ import {
 import {
   MoreVertical,
   Trash2,
+  Pencil,
   TrendingUp,
   TrendingDown,
   ArrowLeftRight,
 } from "lucide-react";
 import { deleteTransaction } from "@/actions/transactions";
+import { TransactionEditSheet } from "@/components/forms/transaction-edit-sheet";
+import type { BankAccount, Category } from "@prisma/client";
 interface TransactionCardProps {
   transaction: {
     id: string;
@@ -42,10 +45,19 @@ interface TransactionCardProps {
       color: string;
     } | null;
   };
+  accounts: BankAccount[];
+  incomeCategories: Category[];
+  expenseCategories: Category[];
 }
 
-export function TransactionCard({ transaction }: TransactionCardProps) {
+export function TransactionCard({
+  transaction,
+  accounts,
+  incomeCategories,
+  expenseCategories,
+}: TransactionCardProps) {
   const [loading, setLoading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete this transaction?")) {
@@ -146,6 +158,10 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleDelete}
                   disabled={loading}
@@ -159,6 +175,15 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
           </div>
         </div>
       </CardContent>
+      <TransactionEditSheet
+        transaction={transaction}
+        accounts={accounts}
+        incomeCategories={incomeCategories}
+        expenseCategories={expenseCategories}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        trigger={null}
+      />
     </Card>
   );
 }

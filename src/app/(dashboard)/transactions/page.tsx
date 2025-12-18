@@ -31,7 +31,13 @@ export default async function TransactionsPage() {
       ) : (
         <div className="space-y-2">
           {transactions.map((transaction) => (
-            <TransactionCard key={transaction.id} transaction={transaction} />
+            <TransactionCard
+              key={transaction.id}
+              transaction={transaction}
+              accounts={accounts}
+              incomeCategories={incomeCategories}
+              expenseCategories={expenseCategories}
+            />
           ))}
         </div>
       )}

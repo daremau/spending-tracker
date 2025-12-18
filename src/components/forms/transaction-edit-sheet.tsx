@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,33 +20,64 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
-import { createTransaction } from "@/actions/transactions";
+import { Pencil, TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
+import { updateTransaction } from "@/actions/transactions";
 import type { BankAccount, Category } from "@prisma/client";
 
-interface TransactionFormProps {
+type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER";
+
+interface TransactionEditSheetProps {
+  transaction: {
+    id: string;
+    type: TransactionType;
+    amount: number;
+    description: string | null;
+    date: Date | string;
+    account: { id: string };
+    toAccount: { id: string } | null;
+    category: { id: string } | null;
+  };
   accounts: BankAccount[];
   incomeCategories: Category[];
   expenseCategories: Category[];
+  trigger?: ReactNode | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function TransactionForm({
+export function TransactionEditSheet({
+  transaction,
   accounts,
   incomeCategories,
   expenseCategories,
-}: TransactionFormProps) {
-  const [open, setOpen] = useState(false);
+  trigger,
+  open,
+  onOpenChange,
+}: TransactionEditSheetProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState<"INCOME" | "EXPENSE" | "TRANSFER">("EXPENSE");
+  const [type, setType] = useState<TransactionType>(transaction.type);
+  const [accountId, setAccountId] = useState(transaction.account.id);
+  const [toAccountId, setToAccountId] = useState(transaction.toAccount?.id ?? "");
+  const [categoryId, setCategoryId] = useState(transaction.category?.id ?? "");
+  const isOpen = typeof open === "boolean" ? open : uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
     setError(null);
 
+    formData.set("id", transaction.id);
     formData.set("type", type);
 
-    const result = await createTransaction(formData);
+    if (type === "TRANSFER") {
+      formData.set("categoryId", "");
+    } else {
+      formData.set("toAccountId", "");
+    }
+
+    const result = await updateTransaction(formData);
 
     if (result?.error) {
       setError(result.error);
@@ -60,23 +91,41 @@ export function TransactionForm({
 
   const categories = type === "INCOME" ? incomeCategories : expenseCategories;
 
+  function handleTypeChange(value: string) {
+    const nextType = value as TransactionType;
+    setType(nextType);
+    if (nextType === "TRANSFER") {
+      setCategoryId("");
+    } else {
+      setToAccountId("");
+      setCategoryId("");
+    }
+  }
+
+  const formattedDate = new Date(transaction.date).toISOString().split("T")[0];
+
+  const resolvedTrigger =
+    trigger === undefined ? (
+      <Button variant="ghost" className="w-full justify-start px-2">
+        <Pencil className="mr-2 h-4 w-4" />
+        Edit
+      </Button>
+    ) : (
+      trigger
+    );
+
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button size="sm" className="gap-1">
-          <Plus className="h-4 w-4" />
-          Add Transaction
-        </Button>
-      </SheetTrigger>
+    <Sheet open={isOpen} onOpenChange={setOpen}>
+      {resolvedTrigger !== null && (
+        <SheetTrigger asChild>{resolvedTrigger}</SheetTrigger>
+      )}
       <SheetContent side="bottom" className="h-auto max-h-[90vh] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Add Transaction</SheetTitle>
-          <SheetDescription>
-            Record income, expense, or transfer
-          </SheetDescription>
+          <SheetTitle>Edit Transaction</SheetTitle>
+          <SheetDescription>Update the details of this transaction</SheetDescription>
         </SheetHeader>
 
-        <Tabs value={type} onValueChange={(v) => setType(v as typeof type)} className="px-4">
+        <Tabs value={type} onValueChange={handleTypeChange} className="px-4">
           <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="INCOME" className="gap-1">
               <TrendingUp className="h-4 w-4" />
@@ -100,23 +149,24 @@ export function TransactionForm({
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
+              <Label htmlFor="edit-amount">Amount</Label>
               <Input
-                id="amount"
+                id="edit-amount"
                 name="amount"
                 type="number"
                 step="0.01"
                 min="0.01"
                 placeholder="0.00"
+                defaultValue={transaction.amount}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="accountId">
+              <Label htmlFor="edit-accountId">
                 {type === "TRANSFER" ? "From Account" : "Account"}
               </Label>
-              <Select name="accountId" required>
+              <Select name="accountId" value={accountId} onValueChange={setAccountId} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
@@ -132,8 +182,13 @@ export function TransactionForm({
 
             {type === "TRANSFER" && (
               <div className="space-y-2">
-                <Label htmlFor="toAccountId">To Account</Label>
-                <Select name="toAccountId" required>
+                <Label htmlFor="edit-toAccountId">To Account</Label>
+                <Select
+                  name="toAccountId"
+                  value={toAccountId}
+                  onValueChange={setToAccountId}
+                  required
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select destination account" />
                   </SelectTrigger>
@@ -150,8 +205,12 @@ export function TransactionForm({
 
             {type !== "TRANSFER" && (
               <div className="space-y-2">
-                <Label htmlFor="categoryId">Category</Label>
-                <Select name="categoryId">
+                <Label htmlFor="edit-categoryId">Category</Label>
+                <Select
+                  name="categoryId"
+                  value={categoryId}
+                  onValueChange={setCategoryId}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category (optional)" />
                   </SelectTrigger>
@@ -173,33 +232,23 @@ export function TransactionForm({
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description (optional)</Label>
+              <Label htmlFor="edit-description">Description (optional)</Label>
               <Input
-                id="description"
+                id="edit-description"
                 name="description"
                 placeholder="e.g., Grocery shopping"
+                defaultValue={transaction.description ?? ""}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                name="date"
-                type="date"
-                defaultValue={new Date().toISOString().split("T")[0]}
-              />
+              <Label htmlFor="edit-date">Date</Label>
+              <Input id="edit-date" name="date" type="date" defaultValue={formattedDate} />
             </div>
 
             <Button type="submit" className="w-full" disabled={loading || accounts.length === 0}>
-              {loading ? "Adding..." : `Add ${type.charAt(0) + type.slice(1).toLowerCase()}`}
+              {loading ? "Saving..." : "Save Changes"}
             </Button>
-
-            {accounts.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center">
-                Add a bank account first to record transactions
-              </p>
-            )}
           </form>
         </Tabs>
       </SheetContent>
