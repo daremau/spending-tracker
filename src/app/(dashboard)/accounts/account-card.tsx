@@ -3,14 +3,30 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { MoreVertical, Pencil, Trash2, Wallet } from "lucide-react";
-import { deleteAccount } from "@/actions/accounts";
+import { deleteAccount, updateAccount } from "@/actions/accounts";
 interface AccountCardProps {
   account: {
     id: string;
@@ -22,8 +38,13 @@ interface AccountCardProps {
   };
 }
 
+const currencies = ["PYG", "USD", "EUR", "GBP", "BRL", "ARS"];
+
 export function AccountCard({ account }: AccountCardProps) {
-  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isNegative = account.balance < 0;
 
@@ -32,9 +53,25 @@ export function AccountCard({ account }: AccountCardProps) {
       return;
     }
 
-    setLoading(true);
+    setDeleting(true);
     await deleteAccount(account.id);
-    setLoading(false);
+    setDeleting(false);
+  }
+
+  async function handleUpdate(formData: FormData) {
+    setSaving(true);
+    setError(null);
+
+    const result = await updateAccount(account.id, formData);
+
+    if (result?.error) {
+      setError(result.error);
+      setSaving(false);
+      return;
+    }
+
+    setSaving(false);
+    setEditOpen(false);
   }
 
   const formatCurrency = (amount: number, currency: string) => {
@@ -74,9 +111,13 @@ export function AccountCard({ account }: AccountCardProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleDelete}
-                  disabled={loading}
+                  disabled={deleting}
                   className="text-red-600"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -87,6 +128,50 @@ export function AccountCard({ account }: AccountCardProps) {
           </div>
         </div>
       </CardContent>
+      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+        <SheetContent side="bottom" className="h-auto max-h-[90vh]">
+          <SheetHeader>
+            <SheetTitle>Edit Bank Account</SheetTitle>
+            <SheetDescription>
+              Update the account name or currency.
+            </SheetDescription>
+          </SheetHeader>
+          <form action={handleUpdate} className="space-y-4 px-4 pb-6">
+            {error && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950 rounded-md">
+                {error}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor={`name-${account.id}`}>Account Name</Label>
+              <Input
+                id={`name-${account.id}`}
+                name="name"
+                defaultValue={account.name}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`currency-${account.id}`}>Currency</Label>
+              <Select name="currency" defaultValue={account.currency}>
+                <SelectTrigger id={`currency-${account.id}`}>
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currencies.map((currency) => (
+                    <SelectItem key={currency} value={currency}>
+                      {currency}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </form>
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 }
