@@ -3,16 +3,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/spending_tracker?schema=public
-      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-secret-key-change-in-production}
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - traefik-net
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.spending-tracker.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.spending-tracker.entrypoints=web"
+      - "traefik.http.services.spending-tracker.loadbalancer.server.port=3000"
 
   db:
     image: postgres:16-alpine
@@ -22,14 +30,14 @@ services:
       - POSTGRES_DB=spending_tracker
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - internal
 
   # Run migrations on startup (one-time job)
   migrate:
@@ -42,6 +50,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - internal
 
 volumes:
   postgres_data:
+
+networks:
+  traefik-net:
+    external: true
+  internal:
