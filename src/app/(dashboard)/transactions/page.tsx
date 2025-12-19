@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getTransactions } from "@/actions/transactions";
 import { getAccounts } from "@/actions/accounts";
 import { getCategories } from "@/actions/categories";

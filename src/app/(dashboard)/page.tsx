@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Link from "next/link";
 import { getAccounts } from "@/actions/accounts";
 import { getTransactions } from "@/actions/transactions";

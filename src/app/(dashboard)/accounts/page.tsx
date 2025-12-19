@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getAccounts } from "@/actions/accounts";
 import { AccountForm } from "@/components/forms/account-form";
 import { AccountCard } from "./account-card";
