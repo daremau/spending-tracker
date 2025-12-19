@@ -22,10 +22,10 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
 import { createTransaction } from "@/actions/transactions";
-import type { BankAccount, Category } from "@prisma/client";
+import type { Category } from "@prisma/client";
 
 interface TransactionFormProps {
-  accounts: BankAccount[];
+  accounts: { id: string; name: string }[];
   incomeCategories: Category[];
   expenseCategories: Category[];
 }

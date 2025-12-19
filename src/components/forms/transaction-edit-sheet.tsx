@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pencil, TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
 import { updateTransaction } from "@/actions/transactions";
-import type { BankAccount, Category } from "@prisma/client";
+import type { Category } from "@prisma/client";
 
 type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER";
 
@@ -37,7 +37,7 @@ interface TransactionEditSheetProps {
     toAccount: { id: string } | null;
     category: { id: string } | null;
   };
-  accounts: BankAccount[];
+  accounts: { id: string; name: string }[];
   incomeCategories: Category[];
   expenseCategories: Category[];
   trigger?: ReactNode | null;

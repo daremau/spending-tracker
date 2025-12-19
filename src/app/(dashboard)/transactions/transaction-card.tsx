@@ -21,7 +21,15 @@ import {
 } from "lucide-react";
 import { deleteTransaction } from "@/actions/transactions";
 import { TransactionEditSheet } from "@/components/forms/transaction-edit-sheet";
-import type { BankAccount, Category } from "@prisma/client";
+import type { Category } from "@prisma/client";
+
+interface Account {
+  id: string;
+  name: string;
+  currency: string;
+  balance: number;
+}
+
 interface TransactionCardProps {
   transaction: {
     id: string;
@@ -29,12 +37,7 @@ interface TransactionCardProps {
     amount: number;
     description: string | null;
     date: Date;
-    account: {
-      id: string;
-      name: string;
-      currency: string;
-      balance: number;
-    };
+    account: Account;
     toAccount: {
       id: string;
       name: string;
@@ -45,7 +48,7 @@ interface TransactionCardProps {
       color: string;
     } | null;
   };
-  accounts: BankAccount[];
+  accounts: Account[];
   incomeCategories: Category[];
   expenseCategories: Category[];
 }
