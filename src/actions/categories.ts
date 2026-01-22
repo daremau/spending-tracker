@@ -5,6 +5,27 @@ import { prisma } from "@/lib/prisma";
 
 type CategoryType = "INCOME" | "EXPENSE";
 
+const DIGITAL_TAX_CATEGORY_NAME = "IVA Digital Ley 6380";
+const DIGITAL_TAX_CATEGORY_COLOR = "#f59e0b"; // Amber
+
+export async function getOrCreateDigitalTaxCategory() {
+  let category = await prisma.category.findFirst({
+    where: { name: DIGITAL_TAX_CATEGORY_NAME, type: "EXPENSE" },
+  });
+
+  if (!category) {
+    category = await prisma.category.create({
+      data: {
+        name: DIGITAL_TAX_CATEGORY_NAME,
+        type: "EXPENSE",
+        color: DIGITAL_TAX_CATEGORY_COLOR,
+      },
+    });
+  }
+
+  return category;
+}
+
 export async function getCategories(type?: CategoryType) {
   return prisma.category.findMany({
     where: type ? { type } : undefined,
@@ -29,10 +50,29 @@ export async function createCategory(formData: FormData) {
     return { error: "Category already exists" };
   }
 
-  await prisma.category.create({
+  const category = await prisma.category.create({
     data: { name, type, color },
   });
 
+  revalidatePath("/categories");
+  revalidatePath("/transactions");
+  return { success: true, category };
+}
+
+export async function updateCategory(id: string, formData: FormData) {
+  const name = formData.get("name") as string;
+  const color = formData.get("color") as string;
+
+  if (!name) {
+    return { error: "Name is required" };
+  }
+
+  await prisma.category.update({
+    where: { id },
+    data: { name, color },
+  });
+
+  revalidatePath("/categories");
   revalidatePath("/transactions");
   return { success: true };
 }
@@ -42,6 +82,7 @@ export async function deleteCategory(id: string) {
     where: { id },
   });
 
+  revalidatePath("/categories");
   revalidatePath("/transactions");
   return { success: true };
 }

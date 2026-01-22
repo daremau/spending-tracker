@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MoreVertical, Pencil, Trash2, Wallet } from "lucide-react";
+import Link from "next/link";
 import { deleteAccount, updateAccount } from "@/actions/accounts";
 interface AccountCardProps {
   account: {
@@ -84,10 +85,13 @@ export function AccountCard({ account }: AccountCardProps) {
   };
 
   return (
-    <Card>
+    <Card className="hover:bg-accent/50 transition-colors">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link
+            href={`/accounts/${account.id}`}
+            className="flex items-center gap-3 flex-1"
+          >
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
               <Wallet className="h-5 w-5 text-primary" />
             </div>
@@ -95,7 +99,7 @@ export function AccountCard({ account }: AccountCardProps) {
               <h3 className="font-medium">{account.name}</h3>
               <p className="text-xs text-muted-foreground">{account.currency}</p>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-2">
             <span
               className={`text-lg font-semibold ${

@@ -47,6 +47,8 @@ interface TransactionCardProps {
       name: string;
       color: string;
     } | null;
+    isDigitalTax?: boolean;
+    taxTransaction?: { id: string; amount: number } | null;
   };
   accounts: Account[];
   incomeCategories: Category[];
@@ -62,7 +64,14 @@ export function TransactionCard({
   const [loading, setLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
+  const isDigitalTaxTransaction = transaction.isDigitalTax ?? false;
+
   async function handleDelete() {
+    if (isDigitalTaxTransaction) {
+      alert("No se puede eliminar transacciones de IVA directamente. Elimina la transacción original.");
+      return;
+    }
+
     if (!confirm("Are you sure you want to delete this transaction?")) {
       return;
     }
@@ -139,13 +148,21 @@ export function TransactionCard({
                     {transaction.category.name}
                   </Badge>
                 )}
+                {isDigitalTaxTransaction && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs shrink-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                  >
+                    IVA Digital
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 {transaction.type === "TRANSFER"
                   ? `${transaction.account.name} → ${transaction.toAccount?.name}`
                   : transaction.account.name}
                 {" · "}
-                {format(new Date(transaction.date), "MMM d, yyyy")}
+                {format(new Date(new Date(transaction.date).toISOString().split("T")[0] + "T12:00:00"), "MMM d, yyyy")}
               </p>
             </div>
           </div>

@@ -14,6 +14,19 @@ export async function getAccounts() {
   }));
 }
 
+export async function getAccountById(id: string) {
+  const account = await prisma.bankAccount.findUnique({
+    where: { id },
+  });
+
+  if (!account) return null;
+
+  return {
+    ...account,
+    balance: Number(account.balance),
+  };
+}
+
 export async function createAccount(formData: FormData) {
   const name = formData.get("name") as string;
   const balance = parseFloat(formData.get("balance") as string) || 0;

@@ -53,8 +53,15 @@ model Transaction {
   toAccountId   String?
   toAccount     BankAccount?    @relation("TransferToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
 
+  // IVA Digital fields
+  isDigitalTax          Boolean      @default(false)
+  parentTransactionId   String?      @unique
+  parentTransaction     Transaction? @relation("TaxRelation", fields: [parentTransactionId], references: [id], onDelete: Cascade)
+  taxTransaction        Transaction? @relation("TaxRelation")
+
   @@index([accountId])
   @@index([date])
+  @@index([parentTransactionId])
 }
 
 enum TransactionType {

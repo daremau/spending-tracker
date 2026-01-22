@@ -16,7 +16,7 @@ import {
 export default async function DashboardPage() {
   const [accounts, recentTransactions] = await Promise.all([
     getAccounts(),
-    getTransactions(5),
+    getTransactions({ limit: 5 }),
   ]);
 
   const totalBalance = accounts.reduce(
@@ -119,9 +119,13 @@ export default async function DashboardPage() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-1">
             {accounts.slice(0, 3).map((account) => (
-              <div key={account.id} className="flex items-center justify-between">
+              <Link
+                key={account.id}
+                href={`/accounts/${account.id}`}
+                className="flex items-center justify-between p-2 -mx-2 rounded-md hover:bg-accent/50 transition-colors"
+              >
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                     <Wallet className="h-4 w-4 text-primary" />
@@ -135,7 +139,7 @@ export default async function DashboardPage() {
                 >
                   {formatCurrency(Number(account.balance))}
                 </span>
-              </div>
+              </Link>
             ))}
           </CardContent>
         </Card>

@@ -2,27 +2,58 @@ export const dynamic = 'force-dynamic';
 
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SpendingChart } from "@/components/charts/spending-chart";
 import { BalanceChart } from "@/components/charts/balance-chart";
-import { startOfMonth, subMonths, format } from "date-fns";
+import { addMonths, format, startOfMonth, startOfYear, subMonths } from "date-fns";
+import {
+  AnalyticsPeriod,
+  DEFAULT_PERIOD,
+  PERIOD_OPTIONS,
+  getPeriodLabel,
+} from "./periods";
+import { PeriodSwitcher } from "./period-switcher";
+import { CategorySection } from "./category-section";
 
-async function getAnalyticsData() {
+function getDateRange(period: AnalyticsPeriod, now: Date) {
+  switch (period) {
+    case "month":
+      return { start: startOfMonth(now), end: now };
+    case "3m":
+      return { start: startOfMonth(subMonths(now, 2)), end: now };
+    case "6m":
+      return { start: startOfMonth(subMonths(now, 5)), end: now };
+    case "year":
+      return { start: startOfYear(now), end: now };
+    default:
+      return { start: undefined, end: now };
+  }
+}
+
+async function getAnalyticsData(period: AnalyticsPeriod) {
   const now = new Date();
-  const sixMonthsAgo = subMonths(startOfMonth(now), 5);
+  const { start, end } = getDateRange(period, now);
+  const dateFilter = start ? { gte: start, lte: end } : undefined;
 
-  const currentMonthStart = startOfMonth(now);
-  const spendingByCategory = await prisma.transaction.groupBy({
-    by: ["categoryId"],
-    where: {
-      type: "EXPENSE",
-      date: { gte: currentMonthStart },
-    },
-    _sum: { amount: true },
-  });
-
-  const categories = await prisma.category.findMany({
-    where: { type: "EXPENSE" },
-  });
+  const [spendingByCategory, incomeByCategory, categories] = await Promise.all([
+    prisma.transaction.groupBy({
+      by: ["categoryId"],
+      where: {
+        type: "EXPENSE",
+        ...(dateFilter ? { date: dateFilter } : {}),
+      },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.groupBy({
+      by: ["categoryId"],
+      where: {
+        type: "INCOME",
+        ...(dateFilter ? { date: dateFilter } : {}),
+      },
+      _sum: { amount: true },
+    }),
+    prisma.category.findMany({
+      where: { type: { in: ["EXPENSE", "INCOME"] } },
+    }),
+  ]);
 
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
@@ -33,7 +64,19 @@ async function getAnalyticsData() {
       return {
         name: category?.name || "Unknown",
         value: Number(s._sum.amount) || 0,
-        color: category?.color || "#6366f1",
+        color: category?.color || "#ef4444",
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+
+  const incomeData = incomeByCategory
+    .filter((s) => s.categoryId)
+    .map((s) => {
+      const category = categoryMap.get(s.categoryId!);
+      return {
+        name: category?.name || "Unknown",
+        value: Number(s._sum.amount) || 0,
+        color: category?.color || "#22c55e",
       };
     })
     .sort((a, b) => b.value - a.value);
@@ -41,39 +84,56 @@ async function getAnalyticsData() {
   const transactions = await prisma.transaction.findMany({
     where: {
       type: { in: ["INCOME", "EXPENSE"] },
-      date: { gte: sixMonthsAgo },
+      ...(dateFilter ? { date: dateFilter } : {}),
     },
     select: {
       type: true,
       amount: true,
       date: true,
     },
+    orderBy: { date: "asc" },
   });
 
-  const monthlyData: Record<string, { income: number; expense: number }> = {};
+  const balanceData: { name: string; income: number; expense: number }[] = [];
 
-  for (let i = 5; i >= 0; i--) {
-    const monthDate = subMonths(now, i);
-    const key = format(monthDate, "MMM");
-    monthlyData[key] = { income: 0, expense: 0 };
-  }
+  if (transactions.length > 0) {
+    const firstMonth = startOfMonth(
+      dateFilter?.gte ?? new Date(transactions[0].date)
+    );
+    const lastTransactionDate = new Date(transactions[transactions.length - 1].date);
+    const lastMonth = startOfMonth(dateFilter?.lte ?? lastTransactionDate);
+    const monthOrder: string[] = [];
+    const monthMap = new Map<string, { income: number; expense: number }>();
 
-  transactions.forEach((t) => {
-    const key = format(new Date(t.date), "MMM");
-    if (monthlyData[key]) {
-      if (t.type === "INCOME") {
-        monthlyData[key].income += Number(t.amount);
-      } else {
-        monthlyData[key].expense += Number(t.amount);
-      }
+    for (
+      let cursor = firstMonth;
+      cursor <= lastMonth;
+      cursor = addMonths(cursor, 1)
+    ) {
+      const key = format(cursor, "MMM yy");
+      monthOrder.push(key);
+      monthMap.set(key, { income: 0, expense: 0 });
     }
-  });
 
-  const balanceData = Object.entries(monthlyData).map(([name, data]) => ({
-    name,
-    income: data.income,
-    expense: data.expense,
-  }));
+    transactions.forEach((t) => {
+      const key = format(startOfMonth(new Date(t.date)), "MMM yy");
+      const month = monthMap.get(key);
+      if (month) {
+        if (t.type === "INCOME") {
+          month.income += Number(t.amount);
+        } else {
+          month.expense += Number(t.amount);
+        }
+      }
+    });
+
+    balanceData.push(
+      ...monthOrder.map((key) => {
+        const month = monthMap.get(key)!;
+        return { name: key, income: month.income, expense: month.expense };
+      })
+    );
+  }
 
   const totalIncome = transactions
     .filter((t) => t.type === "INCOME")
@@ -85,16 +145,36 @@ async function getAnalyticsData() {
 
   return {
     spendingData,
+    incomeData,
     balanceData,
     totalIncome,
     totalExpense,
     netSavings: totalIncome - totalExpense,
+    periodLabel: getPeriodLabel(period),
   };
 }
 
-export default async function AnalyticsPage() {
-  const { spendingData, balanceData, totalIncome, totalExpense, netSavings } =
-    await getAnalyticsData();
+interface AnalyticsPageProps {
+  searchParams?: {
+    period?: string;
+  };
+}
+
+export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
+  const periodParam = (searchParams?.period as AnalyticsPeriod) ?? DEFAULT_PERIOD;
+  const period = PERIOD_OPTIONS.some((option) => option.value === periodParam)
+    ? periodParam
+    : DEFAULT_PERIOD;
+
+  const {
+    spendingData,
+    incomeData,
+    balanceData,
+    totalIncome,
+    totalExpense,
+    netSavings,
+    periodLabel,
+  } = await getAnalyticsData(period);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-PY", {
@@ -107,7 +187,10 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="text-xl font-semibold">Analytics</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Analytics</h2>
+        <PeriodSwitcher value={period} />
+      </div>
 
       <div className="grid grid-cols-3 gap-2">
         <Card>
@@ -143,63 +226,24 @@ export default async function AnalyticsPage() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Income vs Expenses</CardTitle>
-          <p className="text-xs text-muted-foreground">Last 6 months</p>
+          <p className="text-xs text-muted-foreground">{periodLabel}</p>
         </CardHeader>
         <CardContent>
           <BalanceChart data={balanceData} />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Spending by Category</CardTitle>
-          <p className="text-xs text-muted-foreground">This month</p>
-        </CardHeader>
-        <CardContent>
-          <SpendingChart data={spendingData} />
-        </CardContent>
-      </Card>
+      <CategorySection
+        data={spendingData}
+        periodLabel={periodLabel}
+        title="Spending by Category"
+      />
 
-      {spendingData.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Category Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {spendingData.map((category) => {
-              const percentage =
-                totalExpense > 0
-                  ? ((category.value / totalExpense) * 100).toFixed(1)
-                  : 0;
-              return (
-                <div key={category.name} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-3 w-3 rounded-full"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      <span>{category.name}</span>
-                    </div>
-                    <span className="font-medium">
-                      {formatCurrency(category.value)}
-                    </span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${percentage}%`,
-                        backgroundColor: category.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+      <CategorySection
+        data={incomeData}
+        periodLabel={periodLabel}
+        title="Income by Category"
+      />
     </div>
   );
 }

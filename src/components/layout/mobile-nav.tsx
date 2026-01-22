@@ -7,13 +7,14 @@ import {
   LayoutDashboard,
   Wallet,
   ArrowLeftRight,
+  Tags,
   BarChart3,
 } from "lucide-react";
 
 const navItems = [
   {
     href: "/",
-    label: "Dashboard",
+    label: "Home",
     icon: LayoutDashboard,
   },
   {
@@ -23,8 +24,13 @@ const navItems = [
   },
   {
     href: "/transactions",
-    label: "Transactions",
+    label: "Txns",
     icon: ArrowLeftRight,
+  },
+  {
+    href: "/categories",
+    label: "Categories",
+    icon: Tags,
   },
   {
     href: "/analytics",
@@ -40,7 +46,10 @@ export function MobileNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive =
+            item.href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(item.href);
           const Icon = item.icon;
 
           return (

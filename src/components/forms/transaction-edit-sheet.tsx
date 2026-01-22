@@ -36,6 +36,8 @@ interface TransactionEditSheetProps {
     account: { id: string };
     toAccount: { id: string } | null;
     category: { id: string } | null;
+    isDigitalTax?: boolean;
+    taxTransaction?: { id: string; amount: number } | null;
   };
   accounts: { id: string; name: string }[];
   incomeCategories: Category[];
@@ -61,8 +63,10 @@ export function TransactionEditSheet({
   const [accountId, setAccountId] = useState(transaction.account.id);
   const [toAccountId, setToAccountId] = useState(transaction.toAccount?.id ?? "");
   const [categoryId, setCategoryId] = useState(transaction.category?.id ?? "");
+  const [applyDigitalTax, setApplyDigitalTax] = useState(!!transaction.taxTransaction);
   const isOpen = typeof open === "boolean" ? open : uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
+  const isDigitalTaxTransaction = transaction.isDigitalTax ?? false;
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -70,6 +74,7 @@ export function TransactionEditSheet({
 
     formData.set("id", transaction.id);
     formData.set("type", type);
+    formData.set("applyDigitalTax", applyDigitalTax ? "true" : "false");
 
     if (type === "TRANSFER") {
       formData.set("categoryId", "");
@@ -142,6 +147,12 @@ export function TransactionEditSheet({
           </TabsList>
 
           <form action={handleSubmit} className="space-y-4 pb-6">
+            {isDigitalTaxTransaction && (
+              <div className="p-3 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md">
+                Esta es una transacción de IVA Digital. Para modificarla, edita la transacción original.
+              </div>
+            )}
+
             {error && (
               <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950 rounded-md">
                 {error}
@@ -210,9 +221,11 @@ export function TransactionEditSheet({
                   name="categoryId"
                   value={categoryId}
                   onValueChange={setCategoryId}
+                  required
+                  disabled={isDigitalTaxTransaction}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category (optional)" />
+                    <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
@@ -231,6 +244,28 @@ export function TransactionEditSheet({
               </div>
             )}
 
+            {type === "EXPENSE" && !isDigitalTaxTransaction && (
+              <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md">
+                <input
+                  type="checkbox"
+                  id="edit-applyDigitalTax"
+                  checked={applyDigitalTax}
+                  onChange={(e) => setApplyDigitalTax(e.target.checked)}
+                  className="h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                />
+                <div className="flex-1">
+                  <Label htmlFor="edit-applyDigitalTax" className="text-sm font-medium cursor-pointer">
+                    Aplicar IVA Digital (10%)
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {transaction.taxTransaction
+                      ? `Tiene IVA asociado de ${transaction.taxTransaction.amount.toLocaleString()}`
+                      : "Ley 6380 - Se creará una transacción adicional del 10%"}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="edit-description">Description (optional)</Label>
               <Input
@@ -243,10 +278,16 @@ export function TransactionEditSheet({
 
             <div className="space-y-2">
               <Label htmlFor="edit-date">Date</Label>
-              <Input id="edit-date" name="date" type="date" defaultValue={formattedDate} />
+              <Input
+                id="edit-date"
+                name="date"
+                type="date"
+                lang="es"
+                defaultValue={formattedDate}
+              />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading || accounts.length === 0}>
+            <Button type="submit" className="w-full" disabled={loading || accounts.length === 0 || isDigitalTaxTransaction}>
               {loading ? "Saving..." : "Save Changes"}
             </Button>
           </form>
