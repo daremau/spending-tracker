@@ -36,9 +36,7 @@ export const accountRowSchema = z.object({
 
 export const categoryRowSchema = z.object({
   name: z.string().min(1, "Category name is required"),
-  type: z.enum(["INCOME", "EXPENSE"], {
-    errorMap: () => ({ message: "Type must be INCOME or EXPENSE" }),
-  }),
+  type: z.enum(["INCOME", "EXPENSE"], { message: "Type must be INCOME or EXPENSE" }),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex color")
@@ -47,12 +45,10 @@ export const categoryRowSchema = z.object({
 });
 
 export const transactionRowSchema = z.object({
-  type: z.enum(["INCOME", "EXPENSE", "TRANSFER"], {
-    errorMap: () => ({ message: "Type must be INCOME, EXPENSE, or TRANSFER" }),
-  }),
+  type: z.enum(["INCOME", "EXPENSE", "TRANSFER"], { message: "Type must be INCOME, EXPENSE, or TRANSFER" }),
   amount: z.number().positive("Amount must be positive"),
   description: z.string().nullable().optional().default(null),
-  date: z.date({ errorMap: () => ({ message: "Invalid date format" }) }),
+  date: z.date({ message: "Invalid date format" }),
   accountName: z.string().min(1, "Account name is required"),
   categoryName: z.string().nullable().optional().default(null),
   toAccountName: z.string().nullable().optional().default(null),

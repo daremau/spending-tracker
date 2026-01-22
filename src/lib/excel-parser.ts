@@ -14,7 +14,7 @@ import {
 
 export async function parseExcelFile(buffer: Buffer): Promise<ParsedImportData> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
 
   const errors: ImportError[] = [];
 
@@ -79,7 +79,7 @@ function parseAccountsSheet(
       errors.push({
         sheet: "Accounts",
         row: rowNumber,
-        message: result.error.errors[0].message,
+        message: result.error.issues[0].message,
         data,
       });
     }
@@ -122,7 +122,7 @@ function parseCategoriesSheet(
       errors.push({
         sheet: "Categories",
         row: rowNumber,
-        message: result.error.errors[0].message,
+        message: result.error.issues[0].message,
         data,
       });
     }
@@ -197,7 +197,7 @@ function parseTransactionsSheet(
       errors.push({
         sheet: "Transactions",
         row: rowNumber,
-        message: result.error.errors[0].message,
+        message: result.error.issues[0].message,
         data,
       });
     }
