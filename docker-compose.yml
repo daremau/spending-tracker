@@ -18,6 +18,7 @@ services:
       - internal
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik-net"
       - "traefik.http.routers.spending-tracker.rule=PathPrefix(`/`)"
       - "traefik.http.routers.spending-tracker.entrypoints=web"
       - "traefik.http.services.spending-tracker.loadbalancer.server.port=3000"
@@ -46,7 +47,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: npx prisma migrate deploy
+    command: npx prisma@5.22.0 db push --skip-generate
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/spending_tracker?schema=public
     depends_on:
