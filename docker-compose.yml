@@ -5,13 +5,15 @@ services:
       dockerfile: Dockerfile
     expose:
       - "3000"
+    ports:
+      - "3000:3000"
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/spending_tracker?schema=public
+      - DATABASE_URL=postgresql://postgres:postgres@pgbouncer:5432/spending_tracker?schema=public
     depends_on:
-      db:
-        condition: service_healthy
+      pgbouncer:
+        condition: service_started
     restart: unless-stopped
     networks:
       - traefik-net
@@ -31,6 +33,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=spending_tracker
+      - POSTGRES_HOST_AUTH_METHOD=trust
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -42,6 +45,26 @@ services:
     networks:
       - internal
 
+  # PgBouncer connection pooling
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/spending_tracker
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=1000
+      - DEFAULT_POOL_SIZE=20
+      - MIN_POOL_SIZE=5
+      - RESERVE_POOL_SIZE=5
+      - IGNORE_STARTUP_PARAMETERS=search_path
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - internal
+
   # Run migrations on startup (one-time job)
   migrate:
     build:
@@ -49,10 +72,10 @@ services:
       dockerfile: Dockerfile
     command: npx prisma@5.22.0 db push --skip-generate
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/spending_tracker?schema=public
+      - DATABASE_URL=postgresql://postgres:postgres@pgbouncer:5432/spending_tracker?schema=public
     depends_on:
-      db:
-        condition: service_healthy
+      pgbouncer:
+        condition: service_started
     networks:
       - internal
 
