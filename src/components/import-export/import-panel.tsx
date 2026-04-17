@@ -2,58 +2,42 @@
 
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Upload,
   AlertCircle,
   Check,
   FileSpreadsheet,
+  FileText,
   X,
   Loader2,
 } from "lucide-react";
-import { ImportOptions, ImportResult, ImportStrategy } from "@/lib/excel-types";
 import { useRouter } from "next/navigation";
 
-interface ImportPanelProps {
-  onClose: () => void;
+interface ImportResult {
+  success: boolean;
+  accountsCreated: number;
+  categoriesCreated: number;
+  transactionsCreated: number;
+  errors: string[];
 }
 
-export function ImportPanel({ onClose }: ImportPanelProps) {
+export function ImportPanel({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
-  const [options, setOptions] = useState<ImportOptions>({
-    accounts: "skip",
-    categories: "skip",
-    transactions: "skip",
-  });
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (
-      droppedFile &&
-      (droppedFile.name.toLowerCase().endsWith(".xlsx") ||
-        droppedFile.name.toLowerCase().endsWith(".xls"))
-    ) {
+    if (droppedFile) {
       setFile(droppedFile);
       setError(null);
       setResult(null);
-    } else {
-      setError("Please upload an Excel file (.xlsx or .xls)");
     }
   }, []);
 
@@ -80,7 +64,6 @@ export function ImportPanel({ onClose }: ImportPanelProps) {
     setFile(null);
     setError(null);
     setResult(null);
-    setProgress(0);
   };
 
   async function handleImport() {
@@ -89,58 +72,32 @@ export function ImportPanel({ onClose }: ImportPanelProps) {
     setLoading(true);
     setError(null);
     setResult(null);
-    setProgress(10);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("options", JSON.stringify(options));
 
-      setProgress(30);
-
-      const response = await fetch("/api/import", {
+      const response = await fetch("/api/backup", {
         method: "POST",
         body: formData,
       });
 
-      setProgress(70);
-
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.parseErrors) {
-          const errorMessages = data.parseErrors
-            .slice(0, 3)
-            .map(
-              (e: { sheet: string; row: number; message: string }) =>
-                `Row ${e.row} in ${e.sheet}: ${e.message}`
-            )
-            .join("\n");
-          setError(`Validation errors:\n${errorMessages}`);
-        } else {
-          setError(data.error || "Import failed");
-        }
-        setLoading(false);
-        setProgress(0);
-        return;
+        setError(data.error || "Import failed");
+      } else if (!data.success) {
+        setError(data.errors?.join("\n") || "Import failed");
+      } else {
+        setResult(data);
+        router.refresh();
       }
-
-      setProgress(100);
-      setResult(data);
-      router.refresh();
-    } catch (err) {
-      setError("Failed to import data");
+    } catch {
+      setError("Failed to import backup");
     } finally {
       setLoading(false);
     }
   }
-
-  const updateOption = (
-    key: keyof ImportOptions,
-    value: ImportStrategy
-  ) => {
-    setOptions((prev) => ({ ...prev, [key]: value }));
-  };
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -148,9 +105,17 @@ export function ImportPanel({ onClose }: ImportPanelProps) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const isCSV = file?.name.toLowerCase().endsWith(".csv");
+
   return (
     <div className="space-y-4">
-      {/* File drop zone */}
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          This will replace ALL existing data with the backup file contents.
+        </AlertDescription>
+      </Alert>
+
       {!file && !result && (
         <div
           onDrop={handleDrop}
@@ -162,14 +127,18 @@ export function ImportPanel({ onClose }: ImportPanelProps) {
               : "border-muted-foreground/25 hover:border-muted-foreground/50"
           }`}
         >
-          <FileSpreadsheet className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          {isCSV ? (
+            <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          ) : (
+            <FileSpreadsheet className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          )}
           <p className="text-sm text-muted-foreground mb-2">
-            Drag and drop an Excel file here, or
+            Drag and drop a backup file here, or
           </p>
           <label>
             <input
               type="file"
-              accept=".xlsx,.xls"
+              accept=".csv,.xlsx,.xls"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -178,15 +147,18 @@ export function ImportPanel({ onClose }: ImportPanelProps) {
             </Button>
           </label>
           <p className="text-xs text-muted-foreground mt-2">
-            Supports .xlsx and .xls files up to 10MB
+            Supports .csv, .xlsx, and .xls files
           </p>
         </div>
       )}
 
-      {/* Selected file */}
       {file && !result && (
         <div className="border rounded-lg p-3 flex items-center gap-3">
-          <FileSpreadsheet className="h-8 w-8 text-green-600 shrink-0" />
+          {isCSV ? (
+            <FileText className="h-8 w-8 text-green-600 shrink-0" />
+          ) : (
+            <FileSpreadsheet className="h-8 w-8 text-green-600 shrink-0" />
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{file.name}</p>
             <p className="text-xs text-muted-foreground">
@@ -204,79 +176,6 @@ export function ImportPanel({ onClose }: ImportPanelProps) {
         </div>
       )}
 
-      {/* Import options */}
-      {file && !result && (
-        <div className="space-y-3">
-          <p className="text-sm font-medium">Duplicate handling:</p>
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Accounts</span>
-              <Select
-                value={options.accounts}
-                onValueChange={(v) =>
-                  updateOption("accounts", v as ImportStrategy)
-                }
-              >
-                <SelectTrigger className="w-[120px]" size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="skip">Skip</SelectItem>
-                  <SelectItem value="update">Update</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Categories</span>
-              <Select
-                value={options.categories}
-                onValueChange={(v) =>
-                  updateOption("categories", v as ImportStrategy)
-                }
-              >
-                <SelectTrigger className="w-[120px]" size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="skip">Skip</SelectItem>
-                  <SelectItem value="update">Update</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Transactions</span>
-              <Select
-                value={options.transactions}
-                onValueChange={(v) =>
-                  updateOption("transactions", v as ImportStrategy)
-                }
-              >
-                <SelectTrigger className="w-[120px]" size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="skip">Skip</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Progress */}
-      {loading && (
-        <div className="space-y-2">
-          <Progress value={progress} />
-          <p className="text-xs text-muted-foreground text-center">
-            Importing data...
-          </p>
-        </div>
-      )}
-
-      {/* Error */}
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -286,52 +185,35 @@ export function ImportPanel({ onClose }: ImportPanelProps) {
         </Alert>
       )}
 
-      {/* Result */}
       {result && (
         <div className="space-y-3">
           <Alert>
             <Check className="h-4 w-4" />
-            <AlertDescription>Import completed!</AlertDescription>
+            <AlertDescription>Backup restored successfully!</AlertDescription>
           </Alert>
 
-          <div className="rounded-md bg-muted p-3 text-sm space-y-2">
+          <div className="rounded-md bg-muted p-3 text-sm space-y-1">
             <div className="flex justify-between">
               <span>Accounts:</span>
-              <span>
-                {result.accounts.created} created, {result.accounts.skipped}{" "}
-                skipped
-              </span>
+              <span>{result.accountsCreated} created</span>
             </div>
             <div className="flex justify-between">
               <span>Categories:</span>
-              <span>
-                {result.categories.created} created, {result.categories.skipped}{" "}
-                skipped
-              </span>
+              <span>{result.categoriesCreated} created</span>
             </div>
             <div className="flex justify-between">
               <span>Transactions:</span>
-              <span>
-                {result.transactions.created} created,{" "}
-                {result.transactions.skipped} skipped
-              </span>
+              <span>{result.transactionsCreated} created</span>
             </div>
+            {result.errors.length > 0 && (
+              <div className="mt-2 pt-2 border-t text-destructive">
+                {result.errors.length} errors
+              </div>
+            )}
           </div>
-
-          {(result.accounts.errors.length > 0 ||
-            result.categories.errors.length > 0 ||
-            result.transactions.errors.length > 0) && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Some items could not be imported. Check the data and try again.
-              </AlertDescription>
-            </Alert>
-          )}
         </div>
       )}
 
-      {/* Actions */}
       {!result ? (
         <Button
           onClick={handleImport}
@@ -346,7 +228,7 @@ export function ImportPanel({ onClose }: ImportPanelProps) {
           ) : (
             <>
               <Upload className="h-4 w-4" />
-              Import from Excel
+              Import Backup
             </>
           )}
         </Button>

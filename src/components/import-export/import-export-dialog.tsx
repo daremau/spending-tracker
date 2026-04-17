@@ -23,14 +23,14 @@ export function ImportExportDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1">
           <FileSpreadsheet className="h-4 w-4" />
-          Import/Export
+          Backup
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Import/Export Data</DialogTitle>
+          <DialogTitle>Backup</DialogTitle>
           <DialogDescription>
-            Export your data to Excel or import from an Excel file
+            Export or import a backup of all your data
           </DialogDescription>
         </DialogHeader>
 
