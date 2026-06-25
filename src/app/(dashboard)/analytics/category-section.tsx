@@ -146,44 +146,51 @@ export function CategorySection({ data, periodLabel, title }: CategorySectionPro
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <SpendingChart data={filteredData} />
+      <CardContent>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr] lg:items-center">
+          <SpendingChart data={filteredData} />
 
-        {filteredData.length > 0 && (
-          <div className="space-y-3">
-            {filteredData.map((category) => {
-              const percentage =
-                totalFiltered > 0
-                  ? ((category.value / totalFiltered) * 100).toFixed(1)
-                  : "0";
-              return (
-                <div key={category.name} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-3 w-3 rounded-full"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      <span>{category.name}</span>
+          {filteredData.length > 0 && (
+            <div className="space-y-2.5">
+              {filteredData.map((category) => {
+                const percentage =
+                  totalFiltered > 0
+                    ? (category.value / totalFiltered) * 100
+                    : 0;
+                return (
+                  <div key={category.name} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div
+                          className="h-3 w-3 shrink-0 rounded-full"
+                          style={{ backgroundColor: category.color }}
+                        />
+                        <span className="truncate">{category.name}</span>
+                      </div>
+                      <div className="flex shrink-0 items-baseline gap-2">
+                        <span className="font-medium tabular-nums">
+                          {formatCurrency(category.value)}
+                        </span>
+                        <span className="w-10 text-right text-xs text-muted-foreground tabular-nums">
+                          {percentage.toFixed(1)}%
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-medium">
-                      {formatCurrency(category.value)}
-                    </span>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${percentage}%`,
+                          backgroundColor: category.color,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${percentage}%`,
-                        backgroundColor: category.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

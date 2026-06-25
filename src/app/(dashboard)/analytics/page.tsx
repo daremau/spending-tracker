@@ -12,6 +12,7 @@ import {
 } from "./periods";
 import { PeriodSwitcher } from "./period-switcher";
 import { CategorySection } from "./category-section";
+import { PivotTable, type PivotRow } from "./pivot-table";
 
 function getDateRange(period: AnalyticsPeriod, now: Date) {
   switch (period) {
@@ -90,11 +91,13 @@ async function getAnalyticsData(period: AnalyticsPeriod) {
       type: true,
       amount: true,
       date: true,
+      categoryId: true,
     },
     orderBy: { date: "asc" },
   });
 
   const balanceData: { name: string; income: number; expense: number }[] = [];
+  let monthOrder: string[] = [];
 
   if (transactions.length > 0) {
     const firstMonth = startOfMonth(
@@ -102,7 +105,7 @@ async function getAnalyticsData(period: AnalyticsPeriod) {
     );
     const lastTransactionDate = new Date(transactions[transactions.length - 1].date);
     const lastMonth = startOfMonth(dateFilter?.lte ?? lastTransactionDate);
-    const monthOrder: string[] = [];
+    monthOrder = [];
     const monthMap = new Map<string, { income: number; expense: number }>();
 
     for (
@@ -135,6 +138,39 @@ async function getAnalyticsData(period: AnalyticsPeriod) {
     );
   }
 
+  // Pivot matrix: categories (rows) x months (columns), one section per type
+  const buildPivotRows = (type: "INCOME" | "EXPENSE"): PivotRow[] => {
+    const byCategory = new Map<string, Map<string, number>>();
+    transactions.forEach((t) => {
+      if (t.type !== type || !t.categoryId) return;
+      const monthKey = format(startOfMonth(new Date(t.date)), "MMM yy");
+      if (!byCategory.has(t.categoryId)) byCategory.set(t.categoryId, new Map());
+      const row = byCategory.get(t.categoryId)!;
+      row.set(monthKey, (row.get(monthKey) ?? 0) + Number(t.amount));
+    });
+
+    return Array.from(byCategory.entries())
+      .map(([categoryId, row]) => {
+        const category = categoryMap.get(categoryId);
+        const values = monthOrder.map((month) => row.get(month) ?? 0);
+        const total = values.reduce((sum, v) => sum + v, 0);
+        return {
+          name: category?.name || "Unknown",
+          color: category?.color || (type === "INCOME" ? "#22c55e" : "#ef4444"),
+          values,
+          total,
+          average: monthOrder.length > 0 ? total / monthOrder.length : 0,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+  };
+
+  const pivot = {
+    months: monthOrder,
+    income: buildPivotRows("INCOME"),
+    expense: buildPivotRows("EXPENSE"),
+  };
+
   const totalIncome = transactions
     .filter((t) => t.type === "INCOME")
     .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -147,6 +183,7 @@ async function getAnalyticsData(period: AnalyticsPeriod) {
     spendingData,
     incomeData,
     balanceData,
+    pivot,
     totalIncome,
     totalExpense,
     netSavings: totalIncome - totalExpense,
@@ -170,6 +207,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     spendingData,
     incomeData,
     balanceData,
+    pivot,
     totalIncome,
     totalExpense,
     netSavings,
@@ -232,6 +270,13 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <BalanceChart data={balanceData} />
         </CardContent>
       </Card>
+
+      <PivotTable
+        months={pivot.months}
+        income={pivot.income}
+        expense={pivot.expense}
+        periodLabel={periodLabel}
+      />
 
       <CategorySection
         data={spendingData}

@@ -3,53 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  Wallet,
-  ArrowLeftRight,
-  Tags,
-  BarChart3,
-} from "lucide-react";
-
-const navItems = [
-  {
-    href: "/",
-    label: "Home",
-    icon: LayoutDashboard,
-  },
-  {
-    href: "/accounts",
-    label: "Accounts",
-    icon: Wallet,
-  },
-  {
-    href: "/transactions",
-    label: "Txns",
-    icon: ArrowLeftRight,
-  },
-  {
-    href: "/categories",
-    label: "Categories",
-    icon: Tags,
-  },
-  {
-    href: "/analytics",
-    label: "Analytics",
-    icon: BarChart3,
-  },
-];
+import { navItems, isNavActive } from "./nav-items";
 
 export function MobileNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+          const isActive = isNavActive(item.href, pathname);
           const Icon = item.icon;
 
           return (
