@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Development
-npm run dev              # Start Next.js dev server on http://localhost:3000
+npm run dev:up           # One command: start Postgres (Docker) + sync schema + seed + next dev
+npm run dev              # Start Next.js dev server only (assumes DB already running)
 npm run build            # Production build
 npm run lint             # Run ESLint
 

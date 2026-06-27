@@ -23,23 +23,46 @@ A mobile-first web application for tracking personal finances across multiple ba
 - Docker and Docker Compose
 - npm
 
-## Setup
+## Quick Start
 
-### 1. Clone and install dependencies
+Install dependencies, then start everything with a single command:
 
 ```bash
 npm install
+npm run dev:up
 ```
 
-### 2. Start the database
+`npm run dev:up` brings up the whole local stack:
+
+1. Starts PostgreSQL in Docker and waits until it's healthy
+2. Syncs the Prisma schema (`prisma db push`) and regenerates the client
+3. Seeds default categories (skipped if they already exist)
+4. Starts the Next.js dev server with native hot reload
+
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
+
+> Note: The database runs on port 5434 to avoid conflicts with local PostgreSQL installations. Only Postgres runs in Docker — `next dev` runs on the host for fast hot reload.
+
+## Manual Setup
+
+If you prefer to run the steps individually (or the DB is already running, in which case just use `npm run dev`):
 
 ```bash
+# 1. Install dependencies
+npm install
+
+# 2. Start the database (runs on port 5434)
 docker compose up db -d
+
+# 3. Apply schema + regenerate Prisma client
+npx prisma db push
+
+# 4. Seed default categories (optional)
+npx prisma db seed
+
+# 5. Start the dev server
+npm run dev
 ```
-
-> Note: The database runs on port 5434 to avoid conflicts with local PostgreSQL installations.
-
-### 3. Set up environment variables
 
 The `.env` file should already exist with:
 
@@ -47,35 +70,9 @@ The `.env` file should already exist with:
 DATABASE_URL="postgresql://postgres:postgres@localhost:5434/spending_tracker?schema=public"
 ```
 
-### 4. Run database migrations
+## Production (Docker)
 
-```bash
-npx prisma db push
-```
-
-### 5. Generate Prisma client
-
-```bash
-npx prisma generate
-```
-
-### 6. Seed default categories (optional)
-
-```bash
-npx prisma db seed
-```
-
-## Running the App
-
-### Development
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Production (Docker)
+The full stack (app + PgBouncer + Postgres + migrations) runs via Docker, fronted by Traefik:
 
 ```bash
 # Build and run everything
