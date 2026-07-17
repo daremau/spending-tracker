@@ -31,6 +31,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
 import { createTransaction } from "@/actions/transactions";
 import { createCategory } from "@/actions/categories";
+import { AmountInput } from "@/components/ui/amount-input";
 import type { Category } from "@prisma/client";
 
 interface TransactionFormProps {
@@ -157,12 +158,9 @@ export function TransactionForm({
 
             <div className="space-y-2">
               <Label htmlFor="amount">Amount</Label>
-              <Input
+              <AmountInput
                 id="amount"
                 name="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
                 placeholder="0.00"
                 required
               />

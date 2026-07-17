@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { amountToNumber } from "@/lib/format";
 import { getOrCreateDigitalTaxCategory } from "./categories";
 
 type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER";
@@ -105,7 +106,7 @@ export async function getTransactions(options?: {
 
 export async function createTransaction(formData: FormData) {
   const type = formData.get("type") as TransactionType;
-  const amount = parseFloat(formData.get("amount") as string);
+  const amount = amountToNumber(formData.get("amount") as string);
   const description = formData.get("description") as string;
   const accountId = formData.get("accountId") as string;
   const categoryId = formData.get("categoryId") as string | null;
@@ -198,7 +199,7 @@ export async function createTransaction(formData: FormData) {
 export async function updateTransaction(formData: FormData) {
   const id = formData.get("id") as string;
   const type = formData.get("type") as TransactionType;
-  const amount = parseFloat(formData.get("amount") as string);
+  const amount = amountToNumber(formData.get("amount") as string);
   const description = formData.get("description") as string;
   const accountId = formData.get("accountId") as string;
   const categoryId = formData.get("categoryId") as string | null;

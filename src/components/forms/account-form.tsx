@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sheet";
 import { Plus } from "lucide-react";
 import { createAccount } from "@/actions/accounts";
+import { AmountInput } from "@/components/ui/amount-input";
 
 const currencies = ["PYG", "USD", "EUR", "GBP", "BRL", "ARS"];
 
@@ -77,11 +78,9 @@ export function AccountForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="balance">Initial Balance</Label>
-            <Input
+            <AmountInput
               id="balance"
               name="balance"
-              type="number"
-              step="0.01"
               placeholder="0.00"
               defaultValue="0"
             />

@@ -22,6 +22,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pencil, TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
 import { updateTransaction } from "@/actions/transactions";
+import { AmountInput } from "@/components/ui/amount-input";
 import type { Category } from "@prisma/client";
 
 type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER";
@@ -161,12 +162,9 @@ export function TransactionEditSheet({
 
             <div className="space-y-2">
               <Label htmlFor="edit-amount">Amount</Label>
-              <Input
+              <AmountInput
                 id="edit-amount"
                 name="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
                 placeholder="0.00"
                 defaultValue={transaction.amount}
                 required

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { amountToNumber } from "@/lib/format";
 
 export async function getAccounts() {
   const accounts = await prisma.bankAccount.findMany({
@@ -29,7 +30,7 @@ export async function getAccountById(id: string) {
 
 export async function createAccount(formData: FormData) {
   const name = formData.get("name") as string;
-  const balance = parseFloat(formData.get("balance") as string) || 0;
+  const balance = amountToNumber(formData.get("balance") as string) || 0;
   const currency = (formData.get("currency") as string) || "USD";
 
   if (!name) {
