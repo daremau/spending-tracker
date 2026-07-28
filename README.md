@@ -10,6 +10,10 @@ A mobile-first web application for tracking personal finances across multiple ba
 - Dashboard with account summaries
 - Analytics with spending charts
 
+## Feature Specifications
+
+- [Stock, ETF, and cryptocurrency portfolio](docs/portfolio/README.md)
+
 ## Tech Stack
 
 - **Frontend**: Next.js 16 + shadcn/ui + Tailwind CSS
