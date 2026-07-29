@@ -2,10 +2,17 @@ export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
 import { getAccounts } from "@/actions/accounts";
+import { getBankBalanceSummary } from "@/actions/settings";
 import { getTransactions } from "@/actions/transactions";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  CircleAlert,
   Wallet,
   TrendingUp,
   TrendingDown,
@@ -14,15 +21,11 @@ import {
 } from "lucide-react";
 
 export default async function DashboardPage() {
-  const [accounts, recentTransactions] = await Promise.all([
+  const [accounts, recentTransactions, balanceSummary] = await Promise.all([
     getAccounts(),
     getTransactions({ limit: 5 }),
+    getBankBalanceSummary(),
   ]);
-
-  const totalBalance = accounts.reduce(
-    (sum, account) => sum + Number(account.balance),
-    0
-  );
 
   const thisMonth = new Date();
   thisMonth.setDate(1);
@@ -55,12 +58,33 @@ export default async function DashboardPage() {
       <Card className="bg-primary text-primary-foreground">
         <CardContent className="p-6">
           <p className="text-sm opacity-80">Total Balance</p>
-          <p className="text-3xl font-bold mt-1">{formatCurrency(totalBalance)}</p>
+          <p className="text-3xl font-bold mt-1">
+            {balanceSummary.complete
+              ? formatCurrency(
+                  Number(balanceSummary.value),
+                  balanceSummary.currency
+                )
+              : "Total unavailable"}
+          </p>
           <p className="text-sm opacity-80 mt-2">
-            Across {accounts.length} account{accounts.length !== 1 ? "s" : ""}
+            {balanceSummary.complete
+              ? `Across ${accounts.length} account${accounts.length !== 1 ? "s" : ""}`
+              : `Missing conversion to ${balanceSummary.currency}`}
           </p>
         </CardContent>
       </Card>
+
+      {!balanceSummary.complete && (
+        <Alert>
+          <CircleAlert />
+          <AlertTitle>Balance total is incomplete</AlertTitle>
+          <AlertDescription>
+            Add {balanceSummary.missingRates.join(", ")} in Currency settings.
+            Account balances remain available below in their original
+            currencies.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Monthly Summary */}
       <div className="grid grid-cols-2 gap-3">
@@ -137,7 +161,7 @@ export default async function DashboardPage() {
                     Number(account.balance) >= 0 ? "text-green-600" : "text-red-500"
                   }`}
                 >
-                  {formatCurrency(Number(account.balance))}
+                  {formatCurrency(Number(account.balance), account.currency)}
                 </span>
               </Link>
             ))}
@@ -199,7 +223,10 @@ export default async function DashboardPage() {
                   }`}
                 >
                   {transaction.type === "INCOME" ? "+" : transaction.type === "EXPENSE" ? "-" : ""}
-                  {formatCurrency(Number(transaction.amount))}
+                  {formatCurrency(
+                    Number(transaction.amount),
+                    transaction.account.currency
+                  )}
                 </span>
               </div>
             ))}

@@ -1,7 +1,9 @@
 # Technical Specification: Investment Portfolio
 
-Status: proposed  
-Last reviewed: 2026-07-28  
+Status: implementation in progress
+
+Last reviewed: 2026-07-29
+
 Related: [product specification](./product-spec.md)
 
 ## 1. Current application constraints
@@ -9,12 +11,12 @@ Related: [product specification](./product-spec.md)
 The implementation must fit the existing architecture:
 
 - Next.js 16 App Router and React 19.
-- Prisma 5 with PostgreSQL.
+- Prisma 6 with PostgreSQL.
 - Server actions under `src/actions`.
 - Zod and React Hook Form for input validation.
 - Recharts for data visualization.
 - Atomic balance changes through `prisma.$transaction`.
-- `Decimal(12,2)` bank and transaction amounts.
+- `Decimal(24,8)` bank balances and `Decimal(12,2)` cash transactions.
 - No user or authentication model.
 - CSV and Excel backup can replace the complete local dataset.
 

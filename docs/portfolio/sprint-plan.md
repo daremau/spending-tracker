@@ -1,13 +1,15 @@
 # Sprint Plan: Investment Portfolio
 
-Status: proposed  
-Last reviewed: 2026-07-28  
+Status: implementation in progress
+
+Last reviewed: 2026-07-29
+
 Related: [product specification](./product-spec.md) and
 [technical specification](./technical-spec.md)
 
 ## 1. Planning assumptions
 
-- Six one-week sprints for one developer.
+- Six dependency-ordered functional sprints.
 - Each sprint is a functional vertical slice with a user-visible outcome.
 - Existing behavior remains releasable at the end of every sprint.
 - Portfolio navigation stays feature-flagged until the sprint acceptance checks
@@ -15,6 +17,41 @@ Related: [product specification](./product-spec.md) and
 - Story identifiers map to the functional requirement identifiers in the
   product specification.
 - Scope, not correctness, is reduced when a sprint is constrained.
+
+### Implementation status
+
+As of 2026-07-29, Sprint 1 and Sprint 2 code are complete.
+
+Sprint 1:
+
+- `AppSettings`, directional manual `ExchangeRate` records, and
+  `Decimal(24,8)` bank balances are implemented.
+- Currency settings and manual-rate management are available from the
+  application header.
+- The dashboard aggregate is currency-aware and becomes explicitly incomplete
+  when a required rate is missing.
+- Exact-decimal conversion and validation fixtures pass.
+- The full migration chain, default `PYG` settings seed, and balance precision
+  were verified against a disposable PostgreSQL database.
+
+Sprint 2:
+
+- Investment accounts atomically create one linked `INVESTMENT_CASH` account;
+  ordinary account and spending forms only expose `STANDARD` accounts.
+- The manual asset catalog supports normalized stocks, ETFs, and crypto pairs.
+- Opening positions support 12-decimal quantities, historical reporting FX,
+  idempotent creation, edit, delete, and complete ledger replay.
+- Active manual quotes override transaction-price fallbacks without being
+  overwritten by future provider rows.
+- Feature-flagged portfolio overview, account detail, mobile navigation, empty
+  states, and archive behavior are implemented.
+- The migration chain and the brokerage/BTC/manual-quote fixture passed against
+  a disposable PostgreSQL database. Both portfolio routes returned `200` with
+  the fixture, and a Portfolio-enabled production build passed.
+
+Before enabling the feature in production, complete the interactive 320, 375,
+430, and 1024 CSS-pixel browser checks. Automated Chrome inspection was not
+available in the implementation environment.
 
 ## 2. Dependency map
 

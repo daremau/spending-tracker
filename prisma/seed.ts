@@ -3,9 +3,19 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.appSettings.upsert({
+    where: { id: "singleton" },
+    update: {},
+    create: {
+      id: "singleton",
+      reportingCurrency: "PYG",
+      timezone: "America/Asuncion",
+    },
+  });
+
   const existing = await prisma.category.count();
   if (existing > 0) {
-    console.log("Categories already exist, skipping seed");
+    console.log("Settings ready; categories already exist, skipping category seed");
     return;
   }
 
@@ -24,7 +34,7 @@ async function main() {
   ];
 
   await prisma.category.createMany({ data: categories });
-  console.log("Seeded categories");
+  console.log("Seeded settings and categories");
 }
 
 main()

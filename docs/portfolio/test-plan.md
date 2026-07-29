@@ -1,7 +1,9 @@
 # Test Plan: Investment Portfolio
 
-Status: proposed  
-Last reviewed: 2026-07-28  
+Status: implementation in progress
+
+Last reviewed: 2026-07-29
+
 Related: [technical specification](./technical-spec.md) and
 [sprint plan](./sprint-plan.md)
 

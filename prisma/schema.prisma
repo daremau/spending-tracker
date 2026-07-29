@@ -8,14 +8,151 @@ datasource db {
 }
 
 model BankAccount {
-  id                  String        @id @default(cuid())
-  name                String
-  balance             Decimal       @default(0) @db.Decimal(12, 2)
-  currency            String        @default("PYG")
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  transactions        Transaction[] @relation("AccountTransactions")
-  incomingTransfers   Transaction[] @relation("TransferToAccount")
+  id                String             @id @default(cuid())
+  name              String
+  balance           Decimal            @default(0) @db.Decimal(24, 8)
+  currency          String             @default("PYG")
+  kind              BankAccountKind    @default(STANDARD)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  transactions      Transaction[]      @relation("AccountTransactions")
+  incomingTransfers Transaction[]      @relation("TransferToAccount")
+  investmentAccount InvestmentAccount? @relation("InvestmentCashAccount")
+}
+
+enum BankAccountKind {
+  STANDARD
+  INVESTMENT_CASH
+}
+
+model AppSettings {
+  id                String   @id @default("singleton")
+  reportingCurrency String   @default("PYG")
+  timezone          String   @default("America/Asuncion")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ExchangeRate {
+  id           String             @id @default(cuid())
+  fromCurrency String
+  toCurrency   String
+  source       ExchangeRateSource
+  rate         Decimal            @db.Decimal(24, 10)
+  asOf         DateTime           @default(now())
+  fetchedAt    DateTime           @default(now())
+  active       Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@unique([fromCurrency, toCurrency, source])
+  @@index([toCurrency, active])
+}
+
+enum ExchangeRateSource {
+  TWELVE_DATA
+  MANUAL
+}
+
+model InvestmentAccount {
+  id            String                  @id @default(cuid())
+  name          String
+  type          InvestmentAccountType
+  cashCurrency  String
+  cashAccountId String                  @unique
+  archivedAt    DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  cashAccount   BankAccount             @relation("InvestmentCashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
+  transactions  InvestmentTransaction[]
+
+  @@index([archivedAt])
+}
+
+enum InvestmentAccountType {
+  BROKERAGE
+  EXCHANGE
+  WALLET
+}
+
+model Asset {
+  id                     String                  @id @default(cuid())
+  type                   AssetType
+  symbol                 String
+  name                   String
+  market                 String
+  quoteCurrency          String
+  provider               String?
+  providerSymbol         String?
+  active                 Boolean                 @default(true)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  investmentTransactions InvestmentTransaction[]
+  marketQuotes           MarketQuote[]
+
+  @@unique([type, symbol, market])
+  @@unique([provider, providerSymbol])
+  @@index([active, type])
+}
+
+enum AssetType {
+  STOCK
+  ETF
+  CRYPTO
+}
+
+model InvestmentTransaction {
+  id                String                    @id @default(cuid())
+  clientRequestId   String                    @unique
+  accountId         String
+  assetId           String?
+  type              InvestmentTransactionType
+  quantity          Decimal?                  @db.Decimal(30, 12)
+  unitPrice         Decimal?                  @db.Decimal(24, 8)
+  cashAmount        Decimal?                  @db.Decimal(24, 8)
+  fees              Decimal                   @default(0) @db.Decimal(24, 8)
+  currency          String
+  fxRateToReporting Decimal                   @db.Decimal(24, 10)
+  date              DateTime
+  notes             String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  account           InvestmentAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  asset             Asset?                    @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, date, createdAt])
+  @@index([assetId, date, createdAt])
+  @@index([accountId, assetId])
+}
+
+enum InvestmentTransactionType {
+  OPENING_POSITION
+  BUY
+  SELL
+  DIVIDEND
+  FEE
+}
+
+model MarketQuote {
+  id        String           @id @default(cuid())
+  assetId   String
+  source    MarketDataSource
+  price     Decimal          @db.Decimal(24, 8)
+  currency  String
+  asOf      DateTime
+  fetchedAt DateTime         @default(now())
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  asset     Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, source])
+  @@index([active, source])
+}
+
+enum MarketDataSource {
+  TWELVE_DATA
+  MANUAL
 }
 
 model Category {
@@ -36,28 +173,28 @@ enum CategoryType {
 }
 
 model Transaction {
-  id            String          @id @default(cuid())
-  type          TransactionType
-  amount        Decimal         @db.Decimal(12, 2)
-  description   String?
-  date          DateTime        @default(now())
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id          String          @id @default(cuid())
+  type        TransactionType
+  amount      Decimal         @db.Decimal(12, 2)
+  description String?
+  date        DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  accountId     String
-  account       BankAccount     @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String
+  account   BankAccount @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: Cascade)
 
-  categoryId    String?
-  category      Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  toAccountId   String?
-  toAccount     BankAccount?    @relation("TransferToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
+  toAccountId String?
+  toAccount   BankAccount? @relation("TransferToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
 
   // IVA Digital fields
-  isDigitalTax          Boolean      @default(false)
-  parentTransactionId   String?      @unique
-  parentTransaction     Transaction? @relation("TaxRelation", fields: [parentTransactionId], references: [id], onDelete: Cascade)
-  taxTransaction        Transaction? @relation("TaxRelation")
+  isDigitalTax        Boolean      @default(false)
+  parentTransactionId String?      @unique
+  parentTransaction   Transaction? @relation("TaxRelation", fields: [parentTransactionId], references: [id], onDelete: Cascade)
+  taxTransaction      Transaction? @relation("TaxRelation")
 
   @@index([accountId])
   @@index([date])

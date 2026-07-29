@@ -192,13 +192,15 @@ async function getAnalyticsData(period: AnalyticsPeriod) {
 }
 
 interface AnalyticsPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     period?: string;
-  };
+  }>;
 }
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
-  const periodParam = (searchParams?.period as AnalyticsPeriod) ?? DEFAULT_PERIOD;
+  const resolvedSearchParams = await searchParams;
+  const periodParam =
+    (resolvedSearchParams?.period as AnalyticsPeriod) ?? DEFAULT_PERIOD;
   const period = PERIOD_OPTIONS.some((option) => option.value === periodParam)
     ? periodParam
     : DEFAULT_PERIOD;
@@ -279,12 +281,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       />
 
       <CategorySection
+        key={`spending-${periodLabel}`}
         data={spendingData}
         periodLabel={periodLabel}
         title="Spending by Category"
       />
 
       <CategorySection
+        key={`income-${periodLabel}`}
         data={incomeData}
         periodLabel={periodLabel}
         title="Income by Category"

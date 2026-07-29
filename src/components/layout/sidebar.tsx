@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { navItems, isNavActive } from "./nav-items";
+import { getDesktopNavItems, isNavActive } from "./nav-items";
 
-export function Sidebar() {
+export function Sidebar({ portfolioEnabled }: { portfolioEnabled: boolean }) {
   const pathname = usePathname();
+  const navItems = getDesktopNavItems(portfolioEnabled);
 
   return (
     <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-60 flex-col border-r bg-background">

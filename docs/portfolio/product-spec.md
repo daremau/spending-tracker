@@ -1,8 +1,10 @@
 # Product Specification: Investment Portfolio
 
-Status: proposed  
-Owner: Spending Tracker  
-Last reviewed: 2026-07-28
+Status: implementation in progress
+
+Owner: Spending Tracker
+
+Last reviewed: 2026-07-29
 
 ## 1. Problem
 
@@ -294,4 +296,3 @@ A requirement is complete only when:
 - `npm run lint`, type checking, tests, and production build pass.
 - Documentation is updated when the implemented contract differs from this
   proposal.
-

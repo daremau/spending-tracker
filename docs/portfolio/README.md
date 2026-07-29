@@ -1,12 +1,19 @@
 # Investment Portfolio Documentation
 
-Status: proposed  
-Last reviewed: 2026-07-28  
+Status: implementation in progress
+
+Last reviewed: 2026-07-29
+
 Target application: Spending Tracker
 
 This documentation defines the first implementation of stock, ETF, and
 cryptocurrency portfolio tracking. It is written for the current single-user
 Next.js and Prisma application.
+
+Sprint 1 now provides the currency foundation and Sprint 2 provides manual
+investment accounts, assets, opening positions, prices, and portfolio pages.
+See the implementation status in the [sprint plan](./sprint-plan.md) for
+completed validation and remaining browser acceptance.
 
 ## Documents
 
@@ -54,4 +61,3 @@ The MVP is complete when a user can:
 7. Include investment value in net worth without changing income or expense
    analytics.
 8. Export and restore all portfolio data.
-

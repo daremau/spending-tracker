@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { navItems, isNavActive } from "./nav-items";
+import { getMobileNavItems, isNavActive } from "./nav-items";
 
-export function MobileNav() {
+export function MobileNav({ portfolioEnabled }: { portfolioEnabled: boolean }) {
   const pathname = usePathname();
+  const navItems = getMobileNavItems(portfolioEnabled);
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t">

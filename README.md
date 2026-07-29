@@ -9,6 +9,7 @@ A mobile-first web application for tracking personal finances across multiple ba
 - Transaction categories with colors
 - Dashboard with account summaries
 - Analytics with spending charts
+- Feature-flagged manual stock, ETF, and cryptocurrency portfolios
 
 ## Feature Specifications
 
@@ -17,7 +18,7 @@ A mobile-first web application for tracking personal finances across multiple ba
 ## Tech Stack
 
 - **Frontend**: Next.js 16 + shadcn/ui + Tailwind CSS
-- **Database**: PostgreSQL with Prisma ORM
+- **Database**: PostgreSQL with Prisma 6 ORM
 - **Charts**: Recharts
 - **Containerization**: Docker + docker-compose
 
@@ -72,7 +73,10 @@ The `.env` file should already exist with:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5434/spending_tracker?schema=public"
+PORTFOLIO_ENABLED=true
 ```
+
+Set `PORTFOLIO_ENABLED=true` to show the manual Portfolio routes and navigation.
 
 ## Production (Docker)
 
