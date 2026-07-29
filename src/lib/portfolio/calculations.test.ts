@@ -1,5 +1,10 @@
+import Decimal from "decimal.js";
 import { describe, expect, it } from "vitest";
-import { replayLedger } from "./calculations";
+import {
+  calculateCashAdjustment,
+  calculateTransactionCashEffect,
+  replayLedger,
+} from "./calculations";
 
 const date = "2026-01-01T00:00:00.000Z";
 
@@ -89,5 +94,94 @@ describe("portfolio ledger replay", () => {
 
     expect(state.realizedGainNative).toBe("0");
     expect(state.realizedGainReporting).toBe("50000");
+  });
+
+  it("records dividends and fees without changing quantity or cost", () => {
+    const state = replayLedger([
+      transaction({ id: "buy", type: "BUY", quantity: "2" }),
+      transaction({
+        id: "dividend",
+        type: "DIVIDEND",
+        quantity: null,
+        unitPrice: null,
+        cashAmount: "20",
+        fees: "1",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      }),
+      transaction({
+        id: "fee",
+        type: "FEE",
+        quantity: null,
+        unitPrice: null,
+        cashAmount: "3",
+        createdAt: "2026-01-03T00:00:00.000Z",
+      }),
+    ]);
+
+    expect(state.quantity).toBe("2");
+    expect(state.remainingCostNative).toBe("200");
+    expect(state.dividendsNative).toBe("19");
+    expect(state.feesNative).toBe("4");
+    expect(state.cashEffect).toBe("-184");
+  });
+
+  it("calculates exact create, edit, and delete cash adjustments", () => {
+    const buy = transaction({
+      id: "buy",
+      type: "BUY",
+      quantity: "10",
+      unitPrice: "100",
+      fees: "5",
+    });
+    const editedBuy = { ...buy, unitPrice: "90" };
+
+    expect(calculateTransactionCashEffect(buy)).toBe("-1005");
+    expect(calculateCashAdjustment(null, buy)).toBe("-1005");
+    expect(calculateCashAdjustment(buy, editedBuy)).toBe("100");
+    expect(calculateCashAdjustment(buy, null)).toBe("1005");
+  });
+
+  it("matches the complete Sprint 3 ledger fixture", () => {
+    const state = replayLedger([
+      transaction({
+        id: "buy-1",
+        type: "BUY",
+        quantity: "10",
+        unitPrice: "100",
+        fees: "5",
+      }),
+      transaction({
+        id: "buy-2",
+        type: "BUY",
+        quantity: "5",
+        unitPrice: "120",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      }),
+      transaction({
+        id: "sell",
+        type: "SELL",
+        quantity: "6",
+        unitPrice: "130",
+        fees: "2",
+        createdAt: "2026-01-03T00:00:00.000Z",
+      }),
+      transaction({
+        id: "dividend",
+        type: "DIVIDEND",
+        quantity: null,
+        unitPrice: null,
+        cashAmount: "10",
+        createdAt: "2026-01-04T00:00:00.000Z",
+      }),
+    ]);
+
+    expect(state.quantity).toBe("9");
+    expect(state.remainingCostNative).toBe("963");
+    expect(state.averageCostNative).toBe("107");
+    expect(state.realizedGainNative).toBe("136");
+    expect(state.dividendsNative).toBe("10");
+    expect(state.feesNative).toBe("7");
+    expect(state.cashEffect).toBe("-817");
+    expect(new Decimal("2000").plus(state.cashEffect).toString()).toBe("1183");
   });
 });

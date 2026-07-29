@@ -320,6 +320,7 @@ serializable transaction or conditional balance update.
 
 - Transfer between a standard and investment-cash account.
 - Confirm two balance changes and one transfer record.
+- Repeat the same `clientRequestId` and confirm neither balance changes again.
 - Confirm analytics exclude it.
 
 ### DB-010: Archive behavior

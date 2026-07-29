@@ -14,6 +14,13 @@ export type PortfolioAccountOptionDto = {
   cashCurrency: string;
 };
 
+export type StandardBankAccountOptionDto = {
+  id: string;
+  name: string;
+  currency: string;
+  balance: string;
+};
+
 export type InvestmentActivityDto = {
   id: string;
   clientRequestId: string;
@@ -26,6 +33,16 @@ export type InvestmentActivityDto = {
   fees: string;
   currency: string;
   fxRateToReporting: string;
+  date: string;
+  notes: string | null;
+};
+
+export type PortfolioTransferActivityDto = {
+  id: string;
+  type: "FUNDING" | "WITHDRAWAL";
+  amount: string;
+  currency: string;
+  bankAccountName: string;
   date: string;
   notes: string | null;
 };
@@ -58,6 +75,12 @@ export type PortfolioAccountSummaryDto = PortfolioAccountOptionDto & {
   holdingsValueNative: string | null;
   totalValueNative: string | null;
   totalValueReporting: string | null;
+  realizedGainNative: string;
+  realizedGainReporting: string;
+  dividendsNative: string;
+  dividendsReporting: string;
+  feesNative: string;
+  feesReporting: string;
   reportingCurrency: string;
   complete: boolean;
   missingRates: string[];
@@ -81,5 +104,7 @@ export type PortfolioOverviewDto = {
 export type InvestmentAccountDetailDto = {
   account: PortfolioAccountSummaryDto;
   activities: InvestmentActivityDto[];
+  fundingActivities: PortfolioTransferActivityDto[];
   assets: PortfolioAssetDto[];
+  standardAccounts: StandardBankAccountOptionDto[];
 };

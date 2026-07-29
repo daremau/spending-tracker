@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Archive } from "lucide-react";
 import { getInvestmentAccountDetail } from "@/actions/portfolio";
 import { InvestmentAccountActions } from "@/components/portfolio/investment-account-actions";
+import { InvestmentTransactionForm } from "@/components/portfolio/investment-transaction-form";
 import { OpeningPositionForm } from "@/components/portfolio/opening-position-form";
+import { PortfolioTransferForm } from "@/components/portfolio/portfolio-transfer-form";
 import { PositionCard } from "@/components/portfolio/position-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,21 @@ export default async function InvestmentAccountPage({
       cashCurrency: detail.account.cashCurrency,
     },
   ];
+  const timeline = [
+    ...detail.activities.map((activity) => ({
+      kind: "INVESTMENT" as const,
+      date: activity.date,
+      activity,
+    })),
+    ...detail.fundingActivities.map((activity) => ({
+      kind: "TRANSFER" as const,
+      date: activity.date,
+      activity,
+    })),
+  ].sort(
+    (left, right) =>
+      new Date(right.date).getTime() - new Date(left.date).getTime()
+  );
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -66,7 +83,15 @@ export default async function InvestmentAccountPage({
           </div>
         </div>
         {!archived && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <PortfolioTransferForm
+              account={accountOptions[0]}
+              bankAccounts={detail.standardAccounts}
+            />
+            <InvestmentTransactionForm
+              account={accountOptions[0]}
+              assets={detail.assets}
+            />
             <OpeningPositionForm
               accounts={accountOptions}
               assets={detail.assets}
@@ -124,6 +149,42 @@ export default async function InvestmentAccountPage({
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Realized result</p>
+            <p className="mt-1 text-lg font-semibold">
+              {formatCurrency(
+                detail.account.realizedGainNative,
+                detail.account.cashCurrency
+              )}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Net dividends</p>
+            <p className="mt-1 text-lg font-semibold">
+              {formatCurrency(
+                detail.account.dividendsNative,
+                detail.account.cashCurrency
+              )}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Recorded fees</p>
+            <p className="mt-1 text-lg font-semibold">
+              {formatCurrency(
+                detail.account.feesNative,
+                detail.account.cashCurrency
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Positions</h2>
         {detail.account.positions.length === 0 ? (
@@ -150,44 +211,96 @@ export default async function InvestmentAccountPage({
           <CardTitle className="text-base">Investment activity</CardTitle>
         </CardHeader>
         <CardContent>
-          {detail.activities.length === 0 ? (
+          {timeline.length === 0 ? (
             <p className="text-sm text-muted-foreground">No activity yet.</p>
           ) : (
             <div className="divide-y">
-              {detail.activities.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {activity.type === "OPENING_POSITION"
-                        ? "Opening position"
-                        : activity.type}
-                      {activity.assetSymbol ? ` · ${activity.assetSymbol}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Intl.DateTimeFormat("es-PY").format(
-                        new Date(activity.date)
-                      )}
-                      {activity.quantity
-                        ? ` · ${activity.quantity} @ ${formatCurrency(
-                            activity.unitPrice,
-                            activity.currency
-                          )}`
-                        : ""}
-                    </p>
+              {timeline.map((entry) => {
+                if (entry.kind === "TRANSFER") {
+                  return (
+                    <div
+                      key={`transfer-${entry.activity.id}`}
+                      className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                    >
+                      <div>
+                        <p className="font-medium">
+                          {entry.activity.type === "FUNDING"
+                            ? "Cash funding"
+                            : "Cash withdrawal"}
+                          {" · "}
+                          {entry.activity.bankAccountName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Intl.DateTimeFormat("es-PY").format(
+                            new Date(entry.activity.date)
+                          )}
+                          {" · "}
+                          {formatCurrency(
+                            entry.activity.amount,
+                            entry.activity.currency
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const activity = entry.activity;
+                return (
+                  <div
+                    key={`investment-${activity.id}`}
+                    className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {activity.type === "OPENING_POSITION"
+                          ? "Opening position"
+                          : activity.type}
+                        {activity.assetSymbol
+                          ? ` · ${activity.assetSymbol}`
+                          : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Intl.DateTimeFormat("es-PY").format(
+                          new Date(activity.date)
+                        )}
+                        {activity.quantity
+                          ? ` · ${activity.quantity} @ ${formatCurrency(
+                              activity.unitPrice,
+                              activity.currency
+                            )}`
+                          : activity.cashAmount
+                            ? ` · ${formatCurrency(
+                                activity.cashAmount,
+                                activity.currency
+                              )}`
+                            : ""}
+                        {activity.fees !== "0"
+                          ? ` · Fees ${formatCurrency(
+                              activity.fees,
+                              activity.currency
+                            )}`
+                          : ""}
+                      </p>
+                    </div>
+                    {!archived &&
+                      (activity.type === "OPENING_POSITION" ? (
+                        <OpeningPositionForm
+                          accounts={accountOptions}
+                          assets={detail.assets}
+                          defaultAccountId={detail.account.id}
+                          activity={activity}
+                        />
+                      ) : (
+                        <InvestmentTransactionForm
+                          account={accountOptions[0]}
+                          assets={detail.assets}
+                          activity={activity}
+                        />
+                      ))}
                   </div>
-                  {!archived && activity.type === "OPENING_POSITION" && (
-                    <OpeningPositionForm
-                      accounts={accountOptions}
-                      assets={detail.assets}
-                      defaultAccountId={detail.account.id}
-                      activity={activity}
-                    />
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

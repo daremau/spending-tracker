@@ -7,7 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { aggregateMoney, convertAmount } from "@/lib/money/conversion";
 import {
   addDecimalValues,
+  calculateCashAdjustment,
   calculateMarketValue,
+  calculateTransactionCashEffect,
   replayLedger,
   type LedgerTransactionInput,
 } from "@/lib/portfolio/calculations";
@@ -18,12 +20,15 @@ import type {
   PortfolioAssetDto,
   PortfolioOverviewDto,
   PortfolioPositionDto,
+  PortfolioTransferActivityDto,
 } from "@/lib/portfolio/dtos";
 import {
+  investmentActivitySchema,
   investmentAccountSchema,
   manualAssetSchema,
   manualQuoteSchema,
   openingPositionSchema,
+  portfolioTransferSchema,
 } from "@/lib/portfolio/validation";
 
 const SETTINGS_ID = "singleton";
@@ -46,6 +51,25 @@ function revalidatePortfolio(accountId?: string) {
   revalidatePath("/");
   revalidatePath("/accounts");
   revalidatePath("/transactions");
+}
+
+async function withSerializableRetry<T>(
+  callback: (tx: Prisma.TransactionClient) => Promise<T>
+) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await prisma.$transaction(callback, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      const retryable =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034";
+      if (!retryable || attempt === maxAttempts) throw error;
+    }
+  }
+  throw new Error("Could not complete serializable transaction");
 }
 
 function toLedgerInput(transaction: {
@@ -122,6 +146,36 @@ function serializeActivity(transaction: {
   };
 }
 
+function serializeFundingActivity(
+  transaction: {
+    id: string;
+    amount: Prisma.Decimal;
+    description: string | null;
+    date: Date;
+    accountId: string;
+    account: { name: string; currency: string };
+    toAccount: { name: string; currency: string } | null;
+  },
+  cashAccountId: string
+): PortfolioTransferActivityDto {
+  const funding = transaction.toAccount !== null &&
+    transaction.accountId !== cashAccountId;
+  const bankAccount = funding ? transaction.account : transaction.toAccount;
+  if (!bankAccount) {
+    throw new Error("Portfolio transfer is missing its bank account");
+  }
+
+  return {
+    id: transaction.id,
+    type: funding ? "FUNDING" : "WITHDRAWAL",
+    amount: transaction.amount.toString(),
+    currency: bankAccount.currency,
+    bankAccountName: bankAccount.name,
+    date: transaction.date.toISOString(),
+    notes: transaction.description,
+  };
+}
+
 type LoadedInvestmentAccount = Prisma.InvestmentAccountGetPayload<{
   include: {
     cashAccount: true;
@@ -155,10 +209,24 @@ function buildAccountSummary(
   }
 
   const positions: PortfolioPositionDto[] = [];
+  let realizedGainNative = new Decimal(0);
+  let realizedGainReporting = new Decimal(0);
+  let dividendsNative = new Decimal(0);
+  let dividendsReporting = new Decimal(0);
+  let feesNative = new Decimal(0);
+  let feesReporting = new Decimal(0);
   for (const transactions of grouped.values()) {
     const asset = transactions[0]?.asset;
     if (!asset) continue;
     const state = replayLedger(transactions.map(toLedgerInput));
+    realizedGainNative = realizedGainNative.plus(state.realizedGainNative);
+    realizedGainReporting = realizedGainReporting.plus(
+      state.realizedGainReporting
+    );
+    dividendsNative = dividendsNative.plus(state.dividendsNative);
+    dividendsReporting = dividendsReporting.plus(state.dividendsReporting);
+    feesNative = feesNative.plus(state.feesNative);
+    feesReporting = feesReporting.plus(state.feesReporting);
     if (new Decimal(state.quantity).isZero()) continue;
 
     const manualQuote = asset.marketQuotes.find(
@@ -237,6 +305,21 @@ function buildAccountSummary(
     });
   }
 
+  const accountLevelActivity = account.transactions.filter(
+    (transaction) => !transaction.assetId
+  );
+  if (accountLevelActivity.length > 0) {
+    const state = replayLedger(accountLevelActivity.map(toLedgerInput));
+    realizedGainNative = realizedGainNative.plus(state.realizedGainNative);
+    realizedGainReporting = realizedGainReporting.plus(
+      state.realizedGainReporting
+    );
+    dividendsNative = dividendsNative.plus(state.dividendsNative);
+    dividendsReporting = dividendsReporting.plus(state.dividendsReporting);
+    feesNative = feesNative.plus(state.feesNative);
+    feesReporting = feesReporting.plus(state.feesReporting);
+  }
+
   const missingQuotes = positions
     .filter((position) => !position.marketValueNative)
     .map((position) => position.asset.symbol);
@@ -277,6 +360,12 @@ function buildAccountSummary(
     totalValueNative,
     totalValueReporting:
       totalConversion?.complete === true ? totalConversion.value : null,
+    realizedGainNative: realizedGainNative.toString(),
+    realizedGainReporting: realizedGainReporting.toString(),
+    dividendsNative: dividendsNative.toString(),
+    dividendsReporting: dividendsReporting.toString(),
+    feesNative: feesNative.toString(),
+    feesReporting: feesReporting.toString(),
     reportingCurrency,
     complete:
       missingQuotes.length === 0 &&
@@ -420,12 +509,45 @@ export async function getInvestmentAccountDetail(
   const loadedAccount = state.accounts.find((candidate) => candidate.id === id);
   if (!account || !loadedAccount) return null;
 
+  const [standardAccounts, fundingTransactions] = await Promise.all([
+    prisma.bankAccount.findMany({
+      where: {
+        kind: "STANDARD",
+        currency: account.cashCurrency,
+      },
+      select: { id: true, name: true, currency: true, balance: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.transaction.findMany({
+      where: {
+        type: "TRANSFER",
+        clientRequestId: { not: null },
+        OR: [
+          { accountId: loadedAccount.cashAccountId },
+          { toAccountId: loadedAccount.cashAccountId },
+        ],
+      },
+      include: {
+        account: { select: { name: true, currency: true } },
+        toAccount: { select: { name: true, currency: true } },
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    }),
+  ]);
+
   return {
     account,
     activities: [...loadedAccount.transactions]
       .sort((left, right) => right.date.getTime() - left.date.getTime())
       .map(serializeActivity),
+    fundingActivities: fundingTransactions.map((transaction) =>
+      serializeFundingActivity(transaction, loadedAccount.cashAccountId)
+    ),
     assets: state.assets.map(serializeAsset),
+    standardAccounts: standardAccounts.map((standardAccount) => ({
+      ...standardAccount,
+      balance: standardAccount.balance.toString(),
+    })),
   };
 }
 
@@ -521,6 +643,531 @@ export async function createManualAsset(formData: FormData) {
     return { success: true as const, id: asset.id };
   } catch (error) {
     return { error: actionError(error, "Could not create asset") };
+  }
+}
+
+type InvestmentActivityFormValues = {
+  clientRequestId: string;
+  accountId: string;
+  assetId: string;
+  type: "BUY" | "SELL" | "DIVIDEND" | "FEE";
+  quantity: string;
+  unitPrice: string;
+  cashAmount: string;
+  fees: string;
+  fxRateToReporting: string;
+  date: Date;
+  notes: string;
+};
+
+type NormalizedInvestmentActivity = {
+  clientRequestId: string;
+  accountId: string;
+  assetId: string | null;
+  type: "BUY" | "SELL" | "DIVIDEND" | "FEE";
+  quantity: string | null;
+  unitPrice: string | null;
+  cashAmount: string;
+  fees: string;
+  currency: string;
+  fxRateToReporting: string;
+  date: Date;
+  notes: string | null;
+};
+
+async function normalizeInvestmentActivity(
+  tx: Prisma.TransactionClient,
+  values: InvestmentActivityFormValues
+): Promise<{
+  activity: NormalizedInvestmentActivity;
+  cashAccountId: string;
+}> {
+  const [account, asset, settings] = await Promise.all([
+    tx.investmentAccount.findUnique({
+      where: { id: values.accountId },
+      include: { cashAccount: true },
+    }),
+    values.assetId
+      ? tx.asset.findUnique({ where: { id: values.assetId } })
+      : null,
+    tx.appSettings.findUnique({ where: { id: SETTINGS_ID } }),
+  ]);
+
+  if (!account || account.archivedAt) {
+    throw new Error("Active investment account not found");
+  }
+  if (account.cashAccount.kind !== "INVESTMENT_CASH") {
+    throw new Error("Linked investment cash account is invalid");
+  }
+  if (values.type !== "FEE" && (!asset || !asset.active)) {
+    throw new Error("Active asset not found");
+  }
+  if (values.assetId && (!asset || !asset.active)) {
+    throw new Error("Active asset not found");
+  }
+
+  const currency = asset?.quoteCurrency ?? account.cashCurrency;
+  if (currency !== account.cashCurrency) {
+    throw new Error(
+      `This account uses ${account.cashCurrency}; choose an asset quoted in that currency`
+    );
+  }
+
+  const trade = values.type === "BUY" || values.type === "SELL";
+  const quantity = trade ? values.quantity : null;
+  const unitPrice = trade ? values.unitPrice : null;
+  const cashAmount = trade
+    ? new Decimal(values.quantity).times(values.unitPrice).toString()
+    : values.cashAmount;
+  const fees = values.type === "FEE" ? "0" : values.fees || "0";
+  const reportingCurrency = settings?.reportingCurrency ?? "PYG";
+  const fxRate =
+    currency === reportingCurrency ? "1" : values.fxRateToReporting;
+
+  const activity: NormalizedInvestmentActivity = {
+    clientRequestId: values.clientRequestId,
+    accountId: values.accountId,
+    assetId: asset?.id ?? null,
+    type: values.type,
+    quantity,
+    unitPrice,
+    cashAmount,
+    fees,
+    currency,
+    fxRateToReporting: fxRate,
+    date: values.date,
+    notes: values.notes || null,
+  };
+
+  const cashEffect = new Decimal(calculateTransactionCashEffect({
+    id: activity.clientRequestId,
+    type: activity.type,
+    quantity: activity.quantity,
+    unitPrice: activity.unitPrice,
+    cashAmount: activity.cashAmount,
+    fees: activity.fees,
+  }));
+  if (
+    (activity.type === "SELL" || activity.type === "DIVIDEND") &&
+    !cashEffect.isPositive()
+  ) {
+    throw new Error("Fees must be less than the gross cash amount");
+  }
+
+  return { activity, cashAccountId: account.cashAccountId };
+}
+
+function investmentActivityMatches(
+  existing: {
+    clientRequestId: string;
+    accountId: string;
+    assetId: string | null;
+    type: "OPENING_POSITION" | "BUY" | "SELL" | "DIVIDEND" | "FEE";
+    quantity: Prisma.Decimal | null;
+    unitPrice: Prisma.Decimal | null;
+    cashAmount: Prisma.Decimal | null;
+    fees: Prisma.Decimal;
+    currency: string;
+    fxRateToReporting: Prisma.Decimal;
+    date: Date;
+    notes: string | null;
+  },
+  proposed: NormalizedInvestmentActivity
+) {
+  return (
+    existing.clientRequestId === proposed.clientRequestId &&
+    existing.accountId === proposed.accountId &&
+    existing.assetId === proposed.assetId &&
+    existing.type === proposed.type &&
+    (existing.quantity?.equals(proposed.quantity ?? 0) ??
+      proposed.quantity === null) &&
+    (existing.unitPrice?.equals(proposed.unitPrice ?? 0) ??
+      proposed.unitPrice === null) &&
+    existing.cashAmount?.equals(proposed.cashAmount) === true &&
+    existing.fees.equals(proposed.fees) &&
+    existing.currency === proposed.currency &&
+    existing.fxRateToReporting.equals(proposed.fxRateToReporting) &&
+    existing.date.getTime() === proposed.date.getTime() &&
+    existing.notes === proposed.notes
+  );
+}
+
+function normalizedToLedgerInput(
+  activity: NormalizedInvestmentActivity,
+  id: string,
+  createdAt: Date
+): LedgerTransactionInput {
+  return {
+    id,
+    type: activity.type,
+    quantity: activity.quantity,
+    unitPrice: activity.unitPrice,
+    cashAmount: activity.cashAmount,
+    fees: activity.fees,
+    fxRateToReporting: activity.fxRateToReporting,
+    date: activity.date,
+    createdAt,
+  };
+}
+
+async function validateProposedAssetLedger(
+  tx: Prisma.TransactionClient,
+  proposed: NormalizedInvestmentActivity | null,
+  original: {
+    id: string;
+    accountId: string;
+    assetId: string | null;
+    createdAt: Date;
+  } | null
+) {
+  const accountId = proposed?.accountId ?? original?.accountId;
+  const assetId = proposed?.assetId ?? original?.assetId;
+  if (!accountId || !assetId) return;
+
+  const ledger = await tx.investmentTransaction.findMany({
+    where: {
+      accountId,
+      assetId,
+      ...(original ? { id: { not: original.id } } : {}),
+    },
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+  });
+  replayLedger([
+    ...ledger.map(toLedgerInput),
+    ...(proposed
+      ? [
+          normalizedToLedgerInput(
+            proposed,
+            original?.id ?? proposed.clientRequestId,
+            original?.createdAt ?? new Date()
+          ),
+        ]
+      : []),
+  ]);
+}
+
+async function applyInvestmentCashAdjustment(
+  tx: Prisma.TransactionClient,
+  cashAccountId: string,
+  adjustmentValue: string
+) {
+  const adjustment = new Decimal(adjustmentValue);
+  if (adjustment.isZero()) return;
+
+  if (adjustment.isNegative()) {
+    const debit = adjustment.abs().toString();
+    const result = await tx.bankAccount.updateMany({
+      where: {
+        id: cashAccountId,
+        kind: "INVESTMENT_CASH",
+        balance: { gte: debit },
+      },
+      data: { balance: { decrement: debit } },
+    });
+    if (result.count !== 1) {
+      throw new Error("Insufficient investment cash for this activity");
+    }
+    return;
+  }
+
+  const result = await tx.bankAccount.updateMany({
+    where: { id: cashAccountId, kind: "INVESTMENT_CASH" },
+    data: { balance: { increment: adjustment.toString() } },
+  });
+  if (result.count !== 1) {
+    throw new Error("Linked investment cash account not found");
+  }
+}
+
+function parseInvestmentActivity(formData: FormData) {
+  return investmentActivitySchema.safeParse({
+    clientRequestId: formData.get("clientRequestId"),
+    accountId: formData.get("accountId"),
+    assetId: formData.get("assetId") || "",
+    type: formData.get("type"),
+    quantity: formData.get("quantity") || "",
+    unitPrice: formData.get("unitPrice") || "",
+    cashAmount: formData.get("cashAmount") || "",
+    fees: formData.get("fees") || "0",
+    fxRateToReporting: formData.get("fxRateToReporting"),
+    date: formData.get("date"),
+    notes: formData.get("notes") || "",
+  });
+}
+
+export async function createInvestmentActivity(formData: FormData) {
+  const parsed = parseInvestmentActivity(formData);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid activity" };
+  }
+
+  try {
+    const result = await withSerializableRetry(
+      async (tx) => {
+        const normalized = await normalizeInvestmentActivity(tx, parsed.data);
+        const existing = await tx.investmentTransaction.findUnique({
+          where: { clientRequestId: normalized.activity.clientRequestId },
+        });
+        if (existing) {
+          if (!investmentActivityMatches(existing, normalized.activity)) {
+            throw new Error(
+              "This request identifier was already used for different data"
+            );
+          }
+          return existing;
+        }
+
+        await validateProposedAssetLedger(tx, normalized.activity, null);
+        const adjustment = calculateCashAdjustment(null, {
+          id: normalized.activity.clientRequestId,
+          ...normalized.activity,
+        });
+        await applyInvestmentCashAdjustment(
+          tx,
+          normalized.cashAccountId,
+          adjustment
+        );
+
+        return tx.investmentTransaction.create({
+          data: normalized.activity,
+        });
+      }
+    );
+    revalidatePortfolio(result.accountId);
+    return { success: true as const, id: result.id };
+  } catch (error) {
+    return { error: actionError(error, "Could not create investment activity") };
+  }
+}
+
+export async function updateInvestmentActivity(id: string, formData: FormData) {
+  const parsed = parseInvestmentActivity(formData);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid activity" };
+  }
+
+  try {
+    const result = await withSerializableRetry(
+      async (tx) => {
+        const original = await tx.investmentTransaction.findUnique({
+          where: { id },
+          include: { account: true },
+        });
+        if (!original || original.type === "OPENING_POSITION") {
+          throw new Error("Investment activity not found");
+        }
+        if (original.account.archivedAt) {
+          throw new Error("Archived accounts are read-only");
+        }
+        if (
+          parsed.data.clientRequestId !== original.clientRequestId ||
+          parsed.data.accountId !== original.accountId ||
+          parsed.data.type !== original.type ||
+          (parsed.data.assetId || null) !== original.assetId
+        ) {
+          throw new Error(
+            "Account, asset, type, and request identifier cannot be changed while editing"
+          );
+        }
+
+        const normalized = await normalizeInvestmentActivity(tx, parsed.data);
+        await validateProposedAssetLedger(tx, normalized.activity, original);
+        const adjustment = calculateCashAdjustment(
+          {
+            id: original.id,
+            type: original.type,
+            quantity: original.quantity?.toString() ?? null,
+            unitPrice: original.unitPrice?.toString() ?? null,
+            cashAmount: original.cashAmount?.toString() ?? null,
+            fees: original.fees.toString(),
+          },
+          {
+            id: original.id,
+            type: normalized.activity.type,
+            quantity: normalized.activity.quantity,
+            unitPrice: normalized.activity.unitPrice,
+            cashAmount: normalized.activity.cashAmount,
+            fees: normalized.activity.fees,
+          }
+        );
+        await applyInvestmentCashAdjustment(
+          tx,
+          normalized.cashAccountId,
+          adjustment
+        );
+
+        return tx.investmentTransaction.update({
+          where: { id },
+          data: {
+            quantity: normalized.activity.quantity,
+            unitPrice: normalized.activity.unitPrice,
+            cashAmount: normalized.activity.cashAmount,
+            fees: normalized.activity.fees,
+            currency: normalized.activity.currency,
+            fxRateToReporting: normalized.activity.fxRateToReporting,
+            date: normalized.activity.date,
+            notes: normalized.activity.notes,
+          },
+        });
+      }
+    );
+    revalidatePortfolio(result.accountId);
+    return { success: true as const };
+  } catch (error) {
+    return { error: actionError(error, "Could not update investment activity") };
+  }
+}
+
+export async function deleteInvestmentActivity(id: string) {
+  try {
+    const result = await withSerializableRetry(
+      async (tx) => {
+        const original = await tx.investmentTransaction.findUnique({
+          where: { id },
+          include: { account: true },
+        });
+        if (!original || original.type === "OPENING_POSITION") {
+          throw new Error("Investment activity not found");
+        }
+        if (original.account.archivedAt) {
+          throw new Error("Archived accounts are read-only");
+        }
+
+        await validateProposedAssetLedger(tx, null, original);
+        const adjustment = calculateCashAdjustment(
+          {
+            id: original.id,
+            type: original.type,
+            quantity: original.quantity?.toString() ?? null,
+            unitPrice: original.unitPrice?.toString() ?? null,
+            cashAmount: original.cashAmount?.toString() ?? null,
+            fees: original.fees.toString(),
+          },
+          null
+        );
+        await applyInvestmentCashAdjustment(
+          tx,
+          original.account.cashAccountId,
+          adjustment
+        );
+        await tx.investmentTransaction.delete({ where: { id } });
+        return original;
+      }
+    );
+    revalidatePortfolio(result.accountId);
+    return { success: true as const };
+  } catch (error) {
+    return { error: actionError(error, "Could not delete investment activity") };
+  }
+}
+
+export async function createPortfolioTransfer(formData: FormData) {
+  const parsed = portfolioTransferSchema.safeParse({
+    clientRequestId: formData.get("clientRequestId"),
+    accountId: formData.get("accountId"),
+    bankAccountId: formData.get("bankAccountId"),
+    direction: formData.get("direction"),
+    amount: formData.get("amount"),
+    date: formData.get("date"),
+    notes: formData.get("notes") || "",
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid transfer" };
+  }
+
+  try {
+    const result = await withSerializableRetry(
+      async (tx) => {
+        const [investmentAccount, bankAccount] = await Promise.all([
+          tx.investmentAccount.findUnique({
+            where: { id: parsed.data.accountId },
+            include: { cashAccount: true },
+          }),
+          tx.bankAccount.findFirst({
+            where: { id: parsed.data.bankAccountId, kind: "STANDARD" },
+          }),
+        ]);
+        if (!investmentAccount || investmentAccount.archivedAt) {
+          throw new Error("Active investment account not found");
+        }
+        if (!bankAccount) throw new Error("Standard bank account not found");
+        if (
+          investmentAccount.cashAccount.kind !== "INVESTMENT_CASH" ||
+          investmentAccount.cashAccount.currency !== bankAccount.currency
+        ) {
+          throw new Error(
+            `Choose a standard ${investmentAccount.cashCurrency} account`
+          );
+        }
+
+        const funding = parsed.data.direction === "FUND";
+        const sourceId = funding
+          ? bankAccount.id
+          : investmentAccount.cashAccountId;
+        const destinationId = funding
+          ? investmentAccount.cashAccountId
+          : bankAccount.id;
+        const description =
+          parsed.data.notes ||
+          (funding
+            ? `Fund ${investmentAccount.name}`
+            : `Withdraw from ${investmentAccount.name}`);
+
+        const existing = await tx.transaction.findUnique({
+          where: { clientRequestId: parsed.data.clientRequestId },
+        });
+        if (existing) {
+          if (
+            existing.type !== "TRANSFER" ||
+            existing.accountId !== sourceId ||
+            existing.toAccountId !== destinationId ||
+            !existing.amount.equals(parsed.data.amount) ||
+            existing.date.getTime() !== parsed.data.date.getTime() ||
+            existing.description !== description
+          ) {
+            throw new Error(
+              "This request identifier was already used for different data"
+            );
+          }
+          return existing;
+        }
+
+        const debit = await tx.bankAccount.updateMany({
+          where: {
+            id: sourceId,
+            balance: { gte: parsed.data.amount },
+          },
+          data: { balance: { decrement: parsed.data.amount } },
+        });
+        if (debit.count !== 1) {
+          throw new Error(
+            funding
+              ? "Insufficient bank balance for this funding transfer"
+              : "Insufficient investment cash for this withdrawal"
+          );
+        }
+        await tx.bankAccount.update({
+          where: { id: destinationId },
+          data: { balance: { increment: parsed.data.amount } },
+        });
+
+        return tx.transaction.create({
+          data: {
+            clientRequestId: parsed.data.clientRequestId,
+            type: "TRANSFER",
+            amount: parsed.data.amount,
+            description,
+            date: parsed.data.date,
+            accountId: sourceId,
+            toAccountId: destinationId,
+          },
+        });
+      }
+    );
+    revalidatePortfolio(parsed.data.accountId);
+    return { success: true as const, id: result.id };
+  } catch (error) {
+    return { error: actionError(error, "Could not transfer investment cash") };
   }
 }
 

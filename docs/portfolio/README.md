@@ -10,10 +10,11 @@ This documentation defines the first implementation of stock, ETF, and
 cryptocurrency portfolio tracking. It is written for the current single-user
 Next.js and Prisma application.
 
-Sprint 1 now provides the currency foundation and Sprint 2 provides manual
-investment accounts, assets, opening positions, prices, and portfolio pages.
-See the implementation status in the [sprint plan](./sprint-plan.md) for
-completed validation and remaining browser acceptance.
+Sprint 1 provides the currency foundation, Sprint 2 provides manual investment
+accounts and opening positions, and Sprint 3 provides funding, buys, sells,
+dividends, fees, and replay-safe editing. See the implementation status in the
+[sprint plan](./sprint-plan.md) for completed validation and remaining browser
+acceptance.
 
 ## Documents
 

@@ -38,6 +38,11 @@ export type PositionState = {
   cashEffect: string;
 };
 
+export type CashEffectInput = Pick<
+  LedgerTransactionInput,
+  "id" | "type" | "quantity" | "unitPrice" | "cashAmount" | "fees"
+>;
+
 function requiredPositive(
   value: Decimal.Value | null | undefined,
   field: string,
@@ -63,6 +68,53 @@ function nonNegative(
     throw new Error(`${field} cannot be negative for transaction ${transactionId}`);
   }
   return decimal;
+}
+
+export function calculateTransactionCashEffect(
+  transaction: CashEffectInput
+): string {
+  const fees = nonNegative(transaction.fees, "fees", transaction.id);
+
+  if (transaction.type === "OPENING_POSITION") return "0";
+
+  if (transaction.type === "BUY" || transaction.type === "SELL") {
+    const quantity = requiredPositive(
+      transaction.quantity,
+      "quantity",
+      transaction.id
+    );
+    const unitPrice = requiredPositive(
+      transaction.unitPrice,
+      "unitPrice",
+      transaction.id
+    );
+    const gross = quantity.times(unitPrice);
+    return transaction.type === "BUY"
+      ? gross.plus(fees).negated().toString()
+      : gross.minus(fees).toString();
+  }
+
+  const amount = requiredPositive(
+    transaction.cashAmount,
+    "cashAmount",
+    transaction.id
+  );
+  return transaction.type === "DIVIDEND"
+    ? amount.minus(fees).toString()
+    : amount.negated().toString();
+}
+
+export function calculateCashAdjustment(
+  original: CashEffectInput | null,
+  proposed: CashEffectInput | null
+): string {
+  const originalEffect = original
+    ? new PortfolioDecimal(calculateTransactionCashEffect(original))
+    : new PortfolioDecimal(0);
+  const proposedEffect = proposed
+    ? new PortfolioDecimal(calculateTransactionCashEffect(proposed))
+    : new PortfolioDecimal(0);
+  return proposedEffect.minus(originalEffect).toString();
 }
 
 function stableSort(transactions: LedgerTransactionInput[]) {
@@ -126,7 +178,9 @@ export function replayLedger(
       feesReporting = feesReporting.plus(fees.times(fxRate));
 
       if (transaction.type === "BUY") {
-        cashEffect = cashEffect.minus(addedCost);
+        cashEffect = cashEffect.plus(
+          calculateTransactionCashEffect(transaction)
+        );
       }
       continue;
     }
@@ -168,7 +222,9 @@ export function replayLedger(
       );
       feesNative = feesNative.plus(fees);
       feesReporting = feesReporting.plus(fees.times(fxRate));
-      cashEffect = cashEffect.plus(netProceeds);
+      cashEffect = cashEffect.plus(
+        calculateTransactionCashEffect(transaction)
+      );
 
       if (quantity.isZero()) {
         remainingCostNative = new PortfolioDecimal(0);
@@ -188,7 +244,9 @@ export function replayLedger(
       dividendsReporting = dividendsReporting.plus(netDividend.times(fxRate));
       feesNative = feesNative.plus(fees);
       feesReporting = feesReporting.plus(fees.times(fxRate));
-      cashEffect = cashEffect.plus(netDividend);
+      cashEffect = cashEffect.plus(
+        calculateTransactionCashEffect(transaction)
+      );
       continue;
     }
 
@@ -199,7 +257,7 @@ export function replayLedger(
     );
     feesNative = feesNative.plus(accountFee);
     feesReporting = feesReporting.plus(accountFee.times(fxRate));
-    cashEffect = cashEffect.minus(accountFee);
+    cashEffect = cashEffect.plus(calculateTransactionCashEffect(transaction));
   }
 
   const averageCostNative = quantity.isZero()

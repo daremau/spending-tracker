@@ -34,6 +34,7 @@ const nonNegativeDecimal = (integerDigits: number, fractionalDigits: number) =>
     );
 
 const requiredId = z.string().trim().min(1, "A referenced record is required");
+const requestId = z.string().uuid("Invalid request identifier");
 
 export const investmentAccountSchema = z.object({
   name: z.string().trim().min(1, "Account name is required").max(80),
@@ -67,7 +68,7 @@ export const manualAssetSchema = z.object({
 });
 
 export const openingPositionSchema = z.object({
-  clientRequestId: z.string().uuid("Invalid request identifier"),
+  clientRequestId: requestId,
   accountId: requiredId,
   assetId: requiredId,
   quantity: positiveDecimal(18, 12),
@@ -83,3 +84,75 @@ export const manualQuoteSchema = z.object({
   price: positiveDecimal(16, 8),
   asOf: z.coerce.date(),
 });
+
+export const portfolioTransferSchema = z.object({
+  clientRequestId: requestId,
+  accountId: requiredId,
+  bankAccountId: requiredId,
+  direction: z.enum(["FUND", "WITHDRAW"]),
+  amount: positiveDecimal(10, 2),
+  date: z.coerce.date(),
+  notes: z.string().trim().max(500).optional().default(""),
+});
+
+export const investmentActivitySchema = z
+  .object({
+    clientRequestId: requestId,
+    accountId: requiredId,
+    assetId: z.string().trim().optional().default(""),
+    type: z.enum(["BUY", "SELL", "DIVIDEND", "FEE"]),
+    quantity: z.string().trim().optional().default(""),
+    unitPrice: z.string().trim().optional().default(""),
+    cashAmount: z.string().trim().optional().default(""),
+    fees: z.string().trim().optional().default("0"),
+    fxRateToReporting: positiveDecimal(14, 10),
+    date: z.coerce.date(),
+    notes: z.string().trim().max(500).optional().default(""),
+  })
+  .superRefine((value, context) => {
+    if (value.type !== "FEE" && !value.assetId) {
+      context.addIssue({
+        code: "custom",
+        path: ["assetId"],
+        message: "An asset is required for this activity",
+      });
+    }
+
+    if (value.type === "BUY" || value.type === "SELL") {
+      for (const [field, candidate, schema] of [
+        ["quantity", value.quantity, positiveDecimal(18, 12)],
+        ["unitPrice", value.unitPrice, positiveDecimal(16, 8)],
+      ] as const) {
+        const parsed = schema.safeParse(candidate);
+        if (!parsed.success) {
+          context.addIssue({
+            code: "custom",
+            path: [field],
+            message: parsed.error.issues[0]?.message ?? `Invalid ${field}`,
+          });
+        }
+      }
+    }
+
+    if (value.type === "DIVIDEND" || value.type === "FEE") {
+      const parsed = positiveDecimal(16, 8).safeParse(value.cashAmount);
+      if (!parsed.success) {
+        context.addIssue({
+          code: "custom",
+          path: ["cashAmount"],
+          message: parsed.error.issues[0]?.message ?? "Invalid cash amount",
+        });
+      }
+    }
+
+    const parsedFees = nonNegativeDecimal(16, 8).safeParse(
+      value.type === "FEE" ? "0" : value.fees || "0"
+    );
+    if (!parsedFees.success) {
+      context.addIssue({
+        code: "custom",
+        path: ["fees"],
+        message: parsedFees.error.issues[0]?.message ?? "Invalid fees",
+      });
+    }
+  });

@@ -20,7 +20,7 @@ Related: [product specification](./product-spec.md) and
 
 ### Implementation status
 
-As of 2026-07-29, Sprint 1 and Sprint 2 code are complete.
+As of 2026-07-29, Sprint 1, Sprint 2, and Sprint 3 code are complete.
 
 Sprint 1:
 
@@ -49,9 +49,28 @@ Sprint 2:
   a disposable PostgreSQL database. Both portfolio routes returned `200` with
   the fixture, and a Portfolio-enabled production build passed.
 
+Sprint 3:
+
+- Funding and withdrawal flows reuse one idempotent bank `TRANSFER`, update
+  both balances atomically, appear in portfolio activity, and remain excluded
+  from income and expense analytics.
+- Buys, sells, dividends, and account- or asset-level fees validate currency,
+  replay the complete affected ledger, and apply their linked-cash effect in
+  the same serializable transaction.
+- Historical edits and deletes apply only the exact cash delta; oversells,
+  insufficient cash, and invalid later ledgers roll back without balance drift.
+- Account detail shows merged funding and investment activity plus realized
+  result, net dividends, and recorded fees.
+- The clean migration chain now includes a safe bridge for pre-existing IVA
+  Digital schema drift and portfolio-transfer idempotency.
+- The fixed USD 2,000 database fixture produced USD 1,183 cash, 9 units at
+  USD 107 average cost, and USD 136 realized gain before edit/delete checks.
+  A concurrent-buy fixture allowed exactly one valid debit, and the
+  Portfolio-enabled production build passed.
+
 Before enabling the feature in production, complete the interactive 320, 375,
-430, and 1024 CSS-pixel browser checks. Automated Chrome inspection was not
-available in the implementation environment.
+430, and 1024 CSS-pixel browser checks for Sprints 1 through 3. Automated Chrome
+inspection was not available in the implementation environment.
 
 ## 2. Dependency map
 

@@ -9,7 +9,8 @@ A mobile-first web application for tracking personal finances across multiple ba
 - Transaction categories with colors
 - Dashboard with account summaries
 - Analytics with spending charts
-- Feature-flagged manual stock, ETF, and cryptocurrency portfolios
+- Feature-flagged stock, ETF, and cryptocurrency portfolios with manual
+  funding, trades, dividends, fees, and prices
 
 ## Feature Specifications
 

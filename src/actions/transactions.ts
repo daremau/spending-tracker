@@ -311,6 +311,13 @@ export async function updateTransaction(formData: FormData) {
     return { error: "Transaction not found" };
   }
 
+  if (transaction.clientRequestId) {
+    return {
+      error:
+        "This portfolio transfer must be managed from its investment account.",
+    };
+  }
+
   // Block editing tax transactions directly
   if (transaction.isDigitalTax) {
     return { error: "No se puede editar transacciones de IVA directamente. Edita la transacción original." };
@@ -420,6 +427,13 @@ export async function deleteTransaction(id: string) {
 
   if (!transaction) {
     return { error: "Transaction not found" };
+  }
+
+  if (transaction.clientRequestId) {
+    return {
+      error:
+        "This portfolio transfer must be managed from its investment account.",
+    };
   }
 
   // Block deleting tax transactions directly

@@ -98,6 +98,12 @@ precision.
 This design reuses the current atomic `TRANSFER` behavior for portfolio funding
 and avoids duplicating cash balances in the investment domain.
 
+Portfolio-originated `Transaction` rows store an optional unique
+`clientRequestId`. Ordinary income, expense, and transfer rows leave it null.
+The funding action uses the key to return the prior equivalent transfer without
+applying either balance effect twice; ordinary transaction edit/delete actions
+reject these managed portfolio transfers.
+
 ### 3.3 Investment account
 
 ```text
