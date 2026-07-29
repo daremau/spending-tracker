@@ -71,15 +71,39 @@ async function revertTransactionBalance(
 export async function getTransactions(options?: {
   limit?: number;
   accountId?: string;
+  month?: string;
 }) {
-  const { limit, accountId } = options || {};
+  const { limit, accountId, month } = options || {};
+  const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month ?? "");
+  const monthStart = monthMatch
+    ? new Date(`${monthMatch[1]}-${monthMatch[2]}-01T00:00:00.000Z`)
+    : null;
+  const monthEnd = monthStart
+    ? new Date(
+        Date.UTC(
+          monthStart.getUTCFullYear(),
+          monthStart.getUTCMonth() + 1,
+          1
+        )
+      )
+    : null;
 
   const transactions = await prisma.transaction.findMany({
-    where: accountId
-      ? {
-          OR: [{ accountId }, { toAccountId: accountId }],
-        }
-      : undefined,
+    where: {
+      ...(accountId
+        ? {
+            OR: [{ accountId }, { toAccountId: accountId }],
+          }
+        : {}),
+      ...(monthStart && monthEnd
+        ? {
+            date: {
+              gte: monthStart,
+              lt: monthEnd,
+            },
+          }
+        : {}),
+    },
     include: {
       account: true,
       toAccount: true,
@@ -101,6 +125,26 @@ export async function getTransactions(options?: {
       ? { ...t.taxTransaction, amount: Number(t.taxTransaction.amount) }
       : null,
   }));
+}
+
+export async function getTransactionMonths(accountId?: string) {
+  const transactions = await prisma.transaction.findMany({
+    where: accountId
+      ? {
+          OR: [{ accountId }, { toAccountId: accountId }],
+        }
+      : undefined,
+    select: { date: true },
+    orderBy: { date: "desc" },
+  });
+
+  return Array.from(
+    new Set(
+      transactions.map((transaction) =>
+        transaction.date.toISOString().slice(0, 7)
+      )
+    )
+  );
 }
 
 export async function createTransaction(formData: FormData) {

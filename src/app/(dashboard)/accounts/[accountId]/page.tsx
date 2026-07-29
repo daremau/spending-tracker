@@ -4,24 +4,39 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Wallet } from "lucide-react";
 import { getAccountById, getAccounts } from "@/actions/accounts";
-import { getTransactions } from "@/actions/transactions";
+import {
+  getTransactionMonths,
+  getTransactions,
+} from "@/actions/transactions";
 import { getCategories } from "@/actions/categories";
 import { TransactionForm } from "@/components/forms/transaction-form";
 import { TransactionCard } from "../../transactions/transaction-card";
+import { MonthFilter } from "../../transactions/month-filter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function AccountDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ accountId: string }>;
+  searchParams: Promise<{ month?: string }>;
 }) {
   const { accountId } = await params;
+  const { month } = await searchParams;
 
-  const [account, transactions, accounts, incomeCategories, expenseCategories] =
+  const [
+    account,
+    transactions,
+    transactionMonths,
+    accounts,
+    incomeCategories,
+    expenseCategories,
+  ] =
     await Promise.all([
       getAccountById(accountId),
-      getTransactions({ accountId }),
+      getTransactions({ accountId, month }),
+      getTransactionMonths(accountId),
       getAccounts(),
       getCategories("INCOME"),
       getCategories("EXPENSE"),
@@ -82,14 +97,17 @@ export default async function AccountDetailPage({
       </Card>
 
       {/* Transactions Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold">Transactions</h2>
-        <TransactionForm
-          accounts={accounts}
-          incomeCategories={incomeCategories}
-          expenseCategories={expenseCategories}
-          defaultAccountId={accountId}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <MonthFilter months={transactionMonths} />
+          <TransactionForm
+            accounts={accounts}
+            incomeCategories={incomeCategories}
+            expenseCategories={expenseCategories}
+            defaultAccountId={accountId}
+          />
+        </div>
       </div>
 
       {/* Transactions List */}
@@ -97,10 +115,14 @@ export default async function AccountDetailPage({
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">
-              No transactions yet for this account.
+              {month
+                ? "No transactions in this month for this account."
+                : "No transactions yet for this account."}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Add your first transaction using the button above.
+              {month
+                ? "Choose another month or clear the month filter."
+                : "Add your first transaction using the button above."}
             </p>
           </CardContent>
         </Card>
