@@ -85,7 +85,6 @@ export async function getTransactions(options?: {
       toAccount: true,
       category: true,
       taxTransaction: true,
-      parentTransaction: true,
     },
     orderBy: { date: "desc" },
     take: limit,
