@@ -20,7 +20,7 @@ Related: [product specification](./product-spec.md) and
 
 ### Implementation status
 
-As of 2026-07-30, Sprint 1 through Sprint 5 code is complete.
+As of 2026-07-30, Sprint 1 through Sprint 6 code is complete.
 
 Sprint 1:
 
@@ -119,9 +119,43 @@ Sprint 5:
   `/portfolio/accounts/[id]`, and `/more` all returned `200`, and a
   Portfolio-enabled production build passed.
 
+Sprint 6:
+
+- Backup schema version 2 covers settings, bank accounts, categories,
+  transactions with their IVA Digital parent links, manual exchange rates, the
+  asset catalog, investment accounts, investment transactions, and manual
+  quotes. Every number is serialized as text, so 8-decimal balances and
+  12-decimal quantities survive both CSV and Excel.
+- Records are referenced by natural key rather than database identifier, and
+  the CSV writer and reader now quote and unquote properly, so names holding a
+  comma or a quote round-trip unchanged.
+- Provider-fetched quotes and rates are excluded as a refetchable cache. No
+  environment variable is read during export, so no secret can reach a file.
+- Restore runs a full preflight first: identity references, transfer
+  destinations, tax-parent links, duplicate names, per-asset ledger replay for
+  oversells, and each investment cash balance against its own ledger. A failure
+  aborts before any deletion; a passing file is rewritten inside one Prisma
+  transaction.
+- Version 1 files still import and are upgraded, with their accounts read as
+  standard bank accounts.
+- 103 tests pass, including 25 covering CSV quoting, version 2 round trips in
+  both formats, version 1 compatibility, and every preflight rejection.
+- A disposable PostgreSQL fixture confirmed that the export omits the provider
+  quote and rate, that a malformed asset reference and an oversold ledger were
+  both rejected with the database bit-for-bit unchanged, and that the CSV and
+  Excel round trips reproduced identical portfolio totals, counts, and the IVA
+  Digital parent link.
+- Through the running application, `POST /api/backup` restored a version 2 file,
+  returned `400` with named errors for a corrupted one while leaving the data
+  in place, and still accepted a version 1 file. Ordinary bank workflows were
+  unaffected: `getAccounts` returns standard accounts only, funding transfers
+  stay out of income and expense totals, and a new income transaction moved
+  both the account balance and net worth by its exact amount.
+
 Before enabling the feature in production, complete the interactive 320, 375,
-430, and 1024 CSS-pixel browser checks for Sprints 1 through 5. Automated Chrome
-inspection was not available in the implementation environment.
+430, and 1024 CSS-pixel browser checks for Sprints 1 through 6. Automated Chrome
+inspection was not available in the implementation environment. This is the
+only outstanding item in the release gate.
 
 ## 2. Dependency map
 

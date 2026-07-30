@@ -19,6 +19,10 @@ interface ImportResult {
   accountsCreated: number;
   categoriesCreated: number;
   transactionsCreated: number;
+  assetsCreated: number;
+  investmentAccountsCreated: number;
+  investmentTransactionsCreated: number;
+  sourceVersion: 1 | 2;
   errors: string[];
 }
 
@@ -193,17 +197,25 @@ export function ImportPanel({ onClose }: { onClose: () => void }) {
           </Alert>
 
           <div className="rounded-md bg-muted p-3 text-sm space-y-1">
-            <div className="flex justify-between">
-              <span>Accounts:</span>
-              <span>{result.accountsCreated} created</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Categories:</span>
-              <span>{result.categoriesCreated} created</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Transactions:</span>
-              <span>{result.transactionsCreated} created</span>
+            {(
+              [
+                ["Accounts", result.accountsCreated],
+                ["Categories", result.categoriesCreated],
+                ["Transactions", result.transactionsCreated],
+                ["Assets", result.assetsCreated],
+                ["Investment accounts", result.investmentAccountsCreated],
+                ["Investment activity", result.investmentTransactionsCreated],
+              ] as const
+            )
+              .filter(([, count]) => count > 0)
+              .map(([label, count]) => (
+                <div key={label} className="flex justify-between gap-3">
+                  <span>{label}:</span>
+                  <span className="tabular-nums">{count} created</span>
+                </div>
+              ))}
+            <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+              Restored from a version {result.sourceVersion} backup.
             </div>
             {result.errors.length > 0 && (
               <div className="mt-2 pt-2 border-t text-destructive">

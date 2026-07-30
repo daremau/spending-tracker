@@ -1,8 +1,8 @@
 # Investment Portfolio Documentation
 
-Status: implementation in progress
+Status: implementation complete, pending interactive browser acceptance
 
-Last reviewed: 2026-07-29
+Last reviewed: 2026-07-30
 
 Target application: Spending Tracker
 
@@ -12,10 +12,12 @@ Next.js and Prisma application.
 
 Sprint 1 provides the currency foundation, Sprint 2 provides manual investment
 accounts and opening positions, Sprint 3 provides funding and investment
-activity, and Sprint 4 provides provider-backed asset search, cached prices and
-FX, protected refresh, and explicit freshness states. See the implementation
-status in the [sprint plan](./sprint-plan.md) for completed validation and
-remaining browser acceptance.
+activity, Sprint 4 provides provider-backed asset search, cached prices and FX,
+protected refresh, and explicit freshness states, Sprint 5 provides allocation,
+performance, navigation, and combined net worth, and Sprint 6 provides the
+version 2 backup format, atomic restore, and release documentation. See the
+implementation status in the [sprint plan](./sprint-plan.md) for completed
+validation and remaining browser acceptance.
 
 ## Documents
 
@@ -50,6 +52,10 @@ explicitly changes them:
    and real-time streaming are outside the MVP.
 
 ## MVP completion statement
+
+Every item below is implemented and verified against a disposable PostgreSQL
+database. The remaining release gate is the interactive 320, 375, 430, and 1024
+CSS-pixel browser pass, which the implementation environment could not run.
 
 The MVP is complete when a user can:
 
