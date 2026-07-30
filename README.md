@@ -9,8 +9,8 @@ A mobile-first web application for tracking personal finances across multiple ba
 - Transaction categories with colors
 - Dashboard with account summaries
 - Analytics with spending charts
-- Feature-flagged stock, ETF, and cryptocurrency portfolios with manual
-  funding, trades, dividends, fees, and prices
+- Feature-flagged stock, ETF, and cryptocurrency portfolios with funding,
+  trades, dividends, fees, manual overrides, and optional cached market data
 
 ## Feature Specifications
 
@@ -75,9 +75,21 @@ The `.env` file should already exist with:
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5434/spending_tracker?schema=public"
 PORTFOLIO_ENABLED=true
+
+# Optional server-only automatic quotes and FX
+MARKET_DATA_PROVIDER=twelve-data
+TWELVE_DATA_API_KEY=
+MARKET_DATA_TIMEOUT_MS=8000
+
+# Required only for POST /api/cron/portfolio-quotes
+PORTFOLIO_REFRESH_SECRET=
 ```
 
-Set `PORTFOLIO_ENABLED=true` to show the manual Portfolio routes and navigation.
+Set `PORTFOLIO_ENABLED=true` to show Portfolio routes and navigation. Portfolio
+continues to work with manual assets, prices, and FX when
+`TWELVE_DATA_API_KEY` is empty. When configured, the key is read only by server
+code; the browser refresh action and protected cron route both update the same
+PostgreSQL cache.
 
 ## Production (Docker)
 

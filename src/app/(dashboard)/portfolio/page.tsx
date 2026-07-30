@@ -4,10 +4,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, BriefcaseBusiness, CircleAlert } from "lucide-react";
 import { getPortfolioOverview } from "@/actions/portfolio";
+import { AssetSearch } from "@/components/portfolio/asset-search";
 import { InvestmentAccountForm } from "@/components/portfolio/investment-account-form";
 import { ManualAssetForm } from "@/components/portfolio/manual-asset-form";
 import { OpeningPositionForm } from "@/components/portfolio/opening-position-form";
 import { PositionCard } from "@/components/portfolio/position-card";
+import { RefreshMarketDataButton } from "@/components/portfolio/refresh-market-data-button";
 import {
   Alert,
   AlertDescription,
@@ -51,6 +53,8 @@ export default async function PortfolioPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {positions.length > 0 && <RefreshMarketDataButton />}
+          <AssetSearch />
           <ManualAssetForm />
           <InvestmentAccountForm />
           {activeAccounts.length > 0 && overview.assets.length > 0 && (

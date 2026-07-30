@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { aggregateMoney } from "@/lib/money/conversion";
+import { fxRateIsFresh } from "@/lib/market-data/freshness";
 import {
   currencyCodeSchema,
   manualExchangeRateSchema,
@@ -31,8 +32,11 @@ export async function getCurrencyConfiguration() {
   const [settings, rates] = await Promise.all([
     ensureSettings(),
     prisma.exchangeRate.findMany({
-      where: { source: "MANUAL" },
-      orderBy: [{ active: "desc" }, { fromCurrency: "asc" }],
+      orderBy: [
+        { active: "desc" },
+        { fromCurrency: "asc" },
+        { source: "asc" },
+      ],
     }),
   ]);
 
@@ -44,8 +48,16 @@ export async function getCurrencyConfiguration() {
       fromCurrency: rate.fromCurrency,
       toCurrency: rate.toCurrency,
       rate: rate.rate.toString(),
+      source: rate.source,
       active: rate.active,
       asOf: rate.asOf.toISOString(),
+      fetchedAt: rate.fetchedAt.toISOString(),
+      freshness:
+        rate.source === "MANUAL"
+          ? ("MANUAL" as const)
+          : fxRateIsFresh(rate.asOf)
+            ? ("FRESH" as const)
+            : ("STALE" as const),
     })),
   };
 }

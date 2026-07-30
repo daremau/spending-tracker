@@ -29,8 +29,11 @@ export type CurrencyConfiguration = {
     fromCurrency: string;
     toCurrency: string;
     rate: string;
+    source: "MANUAL" | "TWELVE_DATA";
     active: boolean;
     asOf: string;
+    fetchedAt: string;
+    freshness: "MANUAL" | "FRESH" | "STALE";
   }>;
 };
 
@@ -222,10 +225,10 @@ export function CurrencySettingsDialog({
         <Separator />
 
         <div className="space-y-3">
-          <h3 className="font-medium">Active manual rates</h3>
+          <h3 className="font-medium">Active exchange rates</h3>
           {activeRates.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No manual exchange rates yet.
+              No exchange rates yet.
             </p>
           ) : (
             <div className="space-y-2">
@@ -239,19 +242,29 @@ export function CurrencySettingsDialog({
                       1 {rate.fromCurrency} = {rate.rate} {rate.toCurrency}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Manual rate
+                      {rate.source === "MANUAL"
+                        ? "Manual rate"
+                        : `${rate.freshness === "FRESH" ? "Fresh" : "Stale"} automatic rate · ${new Intl.DateTimeFormat(
+                            "es-PY",
+                            {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            }
+                          ).format(new Date(rate.asOf))}`}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => handleDeactivate(rate.id)}
-                    disabled={pendingAction === `deactivate-${rate.id}`}
-                    aria-label={`Deactivate ${rate.fromCurrency} to ${rate.toCurrency} rate`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {rate.source === "MANUAL" && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleDeactivate(rate.id)}
+                      disabled={pendingAction === `deactivate-${rate.id}`}
+                      aria-label={`Deactivate ${rate.fromCurrency} to ${rate.toCurrency} rate`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

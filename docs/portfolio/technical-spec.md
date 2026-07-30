@@ -499,8 +499,12 @@ An incomplete total is never displayed as if it were complete.
 ```ts
 interface MarketDataProvider {
   searchAssets(query: string, type?: AssetType): Promise<AssetSearchResult[]>;
-  getQuotes(assets: ProviderAssetRef[]): Promise<ProviderQuote[]>;
-  getExchangeRates(pairs: CurrencyPair[]): Promise<ProviderExchangeRate[]>;
+  getQuotes(
+    assets: ProviderAssetRef[]
+  ): Promise<ProviderBatchResult<ProviderQuote>>;
+  getExchangeRates(
+    pairs: CurrencyPair[]
+  ): Promise<ProviderBatchResult<ProviderExchangeRate>>;
 }
 ```
 
@@ -542,6 +546,12 @@ Refresh only assets held in open positions:
 8. Return per-symbol successes and failures.
 
 Do not erase the last valid quote on provider failure.
+
+The implemented freshness windows are 24 hours for stocks and ETFs, 15 minutes
+for cryptocurrencies, and 24 hours for FX. Refresh eligibility uses the cache
+fetch timestamp, while the UI displays freshness from the provider observation
+timestamp. Requests use Twelve Data's `Authorization: apikey ...` header and
+groups of at most eight symbols.
 
 ### Trigger paths
 

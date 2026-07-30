@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { PortfolioPositionDto } from "@/lib/portfolio/dtos";
 import { ManualQuoteForm } from "./manual-quote-form";
+import { QuoteStatus } from "./quote-status";
 
 function formatCurrency(value: string | null, currency: string) {
   if (value === null) return "Unavailable";
@@ -37,17 +38,13 @@ export function PositionCard({
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-semibold">{position.asset.symbol}</h3>
               <Badge variant="secondary">{position.asset.type}</Badge>
-              <Badge variant="outline">
-                {position.quote.source === "MANUAL"
-                  ? "Manual price"
-                  : position.quote.source === "FALLBACK"
-                    ? "Transaction fallback"
-                    : "Price unavailable"}
-              </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
               {position.asset.name} · {position.asset.market}
             </p>
+            <div className="mt-2">
+              <QuoteStatus quote={position.quote} />
+            </div>
           </div>
           {editable && (
             <ManualQuoteForm

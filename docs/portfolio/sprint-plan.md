@@ -20,7 +20,7 @@ Related: [product specification](./product-spec.md) and
 
 ### Implementation status
 
-As of 2026-07-29, Sprint 1, Sprint 2, and Sprint 3 code are complete.
+As of 2026-07-29, Sprint 1 through Sprint 4 code is complete.
 
 Sprint 1:
 
@@ -68,8 +68,29 @@ Sprint 3:
   A concurrent-buy fixture allowed exactly one valid debit, and the
   Portfolio-enabled production build passed.
 
+Sprint 4:
+
+- Twelve Data is isolated behind a server-only provider interface with strict
+  stock, ETF, crypto, quote, and directional-FX normalization.
+- Asset search is debounced and provider selections are revalidated on the
+  server before creating or reusing an asset; manual entry remains available.
+- Manual quote and FX rows take precedence, fresh cached provider rows are
+  skipped, and only stale linked open positions and required currencies are
+  refreshed in bounded batches.
+- Quote cards and currency settings distinguish manual, fresh, stale,
+  transaction fallback, and unavailable values without describing stale data
+  as live.
+- `POST /api/cron/portfolio-quotes` uses the same refresh service as the manual
+  action and requires a timing-safe bearer-secret check.
+- Fifty provider/configuration/freshness/cron and existing domain tests pass. A
+  disposable PostgreSQL fixture verified cache writes, manual precedence,
+  transaction fallback, and cache preservation after quota failure.
+- One read-only Twelve Data demo request validated AAPL search and quote
+  normalization. A production build with fake server secrets passed, and those
+  markers were absent from `.next/static`.
+
 Before enabling the feature in production, complete the interactive 320, 375,
-430, and 1024 CSS-pixel browser checks for Sprints 1 through 3. Automated Chrome
+430, and 1024 CSS-pixel browser checks for Sprints 1 through 4. Automated Chrome
 inspection was not available in the implementation environment.
 
 ## 2. Dependency map
@@ -618,6 +639,11 @@ src/lib/market-data/*
 - Provider contract tests use recorded, sanitized fixtures.
 - One controlled live request validates configured symbols when an API key is
   available.
+- The provider remains optional: portfolio page rendering and the production
+  build complete without making a market-data request.
+- A disposable database fixture confirms that manual rows are never
+  overwritten, stale provider cache is refreshed, and quota failures preserve
+  the last valid cache.
 - The manual fallback demo succeeds with network access disabled.
 
 ### Exit gate

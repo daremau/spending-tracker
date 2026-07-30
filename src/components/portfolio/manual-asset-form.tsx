@@ -47,7 +47,7 @@ export function ManualAssetForm() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Plus />
-          Add asset
+          Add manually
         </Button>
       </DialogTrigger>
       <DialogContent>

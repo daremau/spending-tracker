@@ -56,8 +56,14 @@ export type PortfolioPositionDto = {
   remainingCostReporting: string;
   quote: {
     price: string | null;
-    source: "MANUAL" | "FALLBACK" | "UNAVAILABLE";
+    source:
+      | "MANUAL"
+      | "PROVIDER"
+      | "TRANSACTION_FALLBACK"
+      | "UNAVAILABLE";
+    freshness: "MANUAL" | "FRESH" | "STALE" | "FALLBACK" | "UNAVAILABLE";
     asOf: string | null;
+    fetchedAt: string | null;
     manualQuoteId: string | null;
   };
   marketValueNative: string | null;

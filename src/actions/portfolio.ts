@@ -4,6 +4,7 @@ import Decimal from "decimal.js";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { quoteFreshness } from "@/lib/market-data/freshness";
 import { aggregateMoney, convertAmount } from "@/lib/money/conversion";
 import {
   addDecimalValues,
@@ -251,10 +252,14 @@ function buildAccountSummary(
     const quoteSource = manualQuote
       ? "MANUAL"
       : providerQuote
-        ? "FALLBACK"
+        ? "PROVIDER"
         : fallbackTransaction
-          ? "FALLBACK"
+          ? "TRANSACTION_FALLBACK"
           : "UNAVAILABLE";
+    const quoteAsOf =
+      effectiveQuote?.asOf ??
+      fallbackTransaction?.date ??
+      null;
     const marketValueNative = quotePrice
       ? calculateMarketValue(state.quantity, quotePrice)
       : null;
@@ -278,10 +283,13 @@ function buildAccountSummary(
       quote: {
         price: quotePrice,
         source: quoteSource,
-        asOf:
-          effectiveQuote?.asOf.toISOString() ??
-          fallbackTransaction?.date.toISOString() ??
-          null,
+        freshness: quoteFreshness({
+          source: quoteSource,
+          assetType: asset.type,
+          asOf: quoteAsOf,
+        }),
+        asOf: quoteAsOf?.toISOString() ?? null,
+        fetchedAt: effectiveQuote?.fetchedAt.toISOString() ?? null,
         manualQuoteId: manualQuote?.id ?? null,
       },
       marketValueNative,
