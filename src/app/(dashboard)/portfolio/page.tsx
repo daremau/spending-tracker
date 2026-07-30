@@ -4,12 +4,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, BriefcaseBusiness, CircleAlert } from "lucide-react";
 import { getPortfolioOverview } from "@/actions/portfolio";
+import { AllocationChart } from "@/components/charts/allocation-chart";
 import { AssetSearch } from "@/components/portfolio/asset-search";
 import { InvestmentAccountForm } from "@/components/portfolio/investment-account-form";
 import { ManualAssetForm } from "@/components/portfolio/manual-asset-form";
 import { OpeningPositionForm } from "@/components/portfolio/opening-position-form";
+import { PortfolioAccountFilter } from "@/components/portfolio/portfolio-account-filter";
 import { PositionCard } from "@/components/portfolio/position-card";
 import { RefreshMarketDataButton } from "@/components/portfolio/refresh-market-data-button";
+import { SignedAmount } from "@/components/portfolio/signed-amount";
 import {
   Alert,
   AlertDescription,
@@ -18,20 +21,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { buildPortfolioAllocation } from "@/lib/portfolio/allocation";
+import { formatPortfolioCurrency } from "@/lib/portfolio/format";
 
-function formatCurrency(value: string | null, currency: string) {
-  if (value === null) return "Incomplete";
-  return new Intl.NumberFormat("es-PY", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: currency === "PYG" ? 0 : 2,
-  }).format(Number(value));
-}
-
-export default async function PortfolioPage() {
+export default async function PortfolioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ accountId?: string }>;
+}) {
   if (process.env.PORTFOLIO_ENABLED !== "true") notFound();
 
-  const overview = await getPortfolioOverview();
+  const [overview, params] = await Promise.all([
+    getPortfolioOverview(),
+    searchParams,
+  ]);
   const activeAccounts = overview.accounts.filter(
     (account) => !account.archivedAt
   );
@@ -41,7 +44,42 @@ export default async function PortfolioPage() {
     type: account.type,
     cashCurrency: account.cashCurrency,
   }));
-  const positions = activeAccounts.flatMap((account) => account.positions);
+
+  const selectedAccountId = activeAccounts.some(
+    (account) => account.id === params.accountId
+  )
+    ? params.accountId
+    : undefined;
+  const visibleAccounts = selectedAccountId
+    ? activeAccounts.filter((account) => account.id === selectedAccountId)
+    : activeAccounts;
+
+  const positions = visibleAccounts.flatMap((account) => account.positions);
+  const closedPositions = visibleAccounts.flatMap(
+    (account) => account.closedPositions
+  );
+
+  // The overview ships allocations for the whole portfolio; a single-account
+  // view has to reallocate so its shares still add up to 100%.
+  const allocation = selectedAccountId
+    ? buildPortfolioAllocation(
+        visibleAccounts.flatMap((account) =>
+          account.positions.map((position) => ({
+            accountId: position.accountId,
+            accountName: account.name,
+            asset: position.asset,
+            marketValueReporting: position.marketValueReporting,
+          }))
+        )
+      )
+    : {
+        positionAllocation: overview.positionAllocation,
+        assetTypeAllocation: overview.assetTypeAllocation,
+      };
+
+  const currency = overview.reportingCurrency;
+  const format = (value: string | null) =>
+    formatPortfolioCurrency(value, currency);
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -49,7 +87,7 @@ export default async function PortfolioPage() {
         <div>
           <h1 className="text-2xl font-semibold">Portfolio</h1>
           <p className="text-sm text-muted-foreground">
-            Manual stocks, ETFs, and cryptocurrency positions.
+            Stocks, ETFs, and cryptocurrency positions in {currency}.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -76,7 +114,8 @@ export default async function PortfolioPage() {
               {overview.missingQuotes.length > 0 &&
                 `Missing prices: ${overview.missingQuotes.join(", ")}. `}
               {overview.missingRates.length > 0 &&
-                `Missing rates: ${overview.missingRates.join(", ")}.`}
+                `Missing rates: ${overview.missingRates.join(", ")}. `}
+              Native-currency values stay available on each position below.
             </AlertDescription>
           </Alert>
         )}
@@ -84,23 +123,21 @@ export default async function PortfolioPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Total value</p>
+            <p className="text-xs text-muted-foreground">Investment value</p>
             <p className="mt-1 text-xl font-semibold">
-              {formatCurrency(
-                overview.totalValueReporting,
-                overview.reportingCurrency
-              )}
+              {format(overview.totalValueReporting)}
             </p>
+            <p className="text-xs text-muted-foreground">Holdings plus cash</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Holdings</p>
             <p className="mt-1 text-xl font-semibold">
-              {formatCurrency(
-                overview.holdingsValueReporting,
-                overview.reportingCurrency
-              )}
+              {format(overview.holdingsValueReporting)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Cost {format(overview.costBasisReporting)}
             </p>
           </CardContent>
         </Card>
@@ -108,25 +145,75 @@ export default async function PortfolioPage() {
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Investment cash</p>
             <p className="mt-1 text-xl font-semibold">
-              {formatCurrency(
-                overview.cashValueReporting,
-                overview.reportingCurrency
-              )}
+              {format(overview.cashValueReporting)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Fees {format(overview.feesReporting)}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Open cost</p>
+            <p className="text-xs text-muted-foreground">Unrealized</p>
             <p className="mt-1 text-xl font-semibold">
-              {formatCurrency(
-                overview.costBasisReporting,
-                overview.reportingCurrency
-              )}
+              <SignedAmount
+                value={overview.unrealizedGainReporting}
+                currency={currency}
+              />
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Realized {format(overview.realizedGainReporting)} · Dividends{" "}
+              {format(overview.dividendsReporting)}
             </p>
           </CardContent>
         </Card>
       </div>
+
+      {activeAccounts.length > 1 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <PortfolioAccountFilter accounts={accountOptions} />
+          {selectedAccountId && (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/portfolio">Clear filter</Link>
+            </Button>
+          )}
+        </div>
+      )}
+
+      {positions.length > 0 && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Allocation by position</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AllocationChart
+                slices={allocation.positionAllocation.slices}
+                currency={currency}
+              />
+              {allocation.positionAllocation.excludedSymbols.length > 0 && (
+                <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
+                  Not charted, missing a price or rate:{" "}
+                  {allocation.positionAllocation.excludedSymbols.join(", ")}.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Allocation by asset type
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AllocationChart
+                slices={allocation.assetTypeAllocation.slices}
+                currency={currency}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -150,10 +237,10 @@ export default async function PortfolioPage() {
                 <Link
                   key={account.id}
                   href={`/portfolio/accounts/${account.id}`}
-                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium">{account.name}</p>
                       <Badge variant="outline">{account.type}</Badge>
                     </div>
@@ -163,9 +250,9 @@ export default async function PortfolioPage() {
                       {account.cashCurrency}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 text-right">
+                  <div className="flex shrink-0 items-center gap-2 text-right">
                     <span className="font-medium">
-                      {formatCurrency(
+                      {formatPortfolioCurrency(
                         account.totalValueNative,
                         account.cashCurrency
                       )}
@@ -184,11 +271,13 @@ export default async function PortfolioPage() {
         {positions.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              {overview.assets.length === 0
-                ? "Add an asset, then record your first opening position."
-                : activeAccounts.length === 0
-                  ? "Create an investment account before adding a position."
-                  : "Record an opening position to establish quantity and cost."}
+              {selectedAccountId
+                ? "This account has no open positions."
+                : overview.assets.length === 0
+                  ? "Add an asset, then record your first opening position."
+                  : activeAccounts.length === 0
+                    ? "Create an investment account before adding a position."
+                    : "Record an opening position to establish quantity and cost."}
             </CardContent>
           </Card>
         ) : (
@@ -202,6 +291,43 @@ export default async function PortfolioPage() {
           </div>
         )}
       </section>
+
+      {closedPositions.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Closed positions</h2>
+          <Card>
+            <CardContent className="divide-y p-0">
+              {closedPositions.map((closed) => (
+                <div
+                  key={`${closed.accountId}-${closed.asset.id}`}
+                  className="flex flex-wrap items-center justify-between gap-3 p-4"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{closed.asset.symbol}</p>
+                      <Badge variant="secondary">{closed.asset.type}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {closed.accountName} · closed{" "}
+                      {new Intl.DateTimeFormat("es-PY", {
+                        dateStyle: "medium",
+                      }).format(new Date(closed.lastActivityDate))}
+                    </p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="text-xs text-muted-foreground">Realized</p>
+                    <SignedAmount
+                      value={closed.realizedGainNative}
+                      currency={closed.asset.quoteCurrency}
+                      className="font-medium"
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {overview.accounts.some((account) => account.archivedAt) && (
         <Card>

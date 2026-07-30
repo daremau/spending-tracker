@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
 import { getAccounts } from "@/actions/accounts";
-import { getBankBalanceSummary } from "@/actions/settings";
+import { getNetWorthSummary } from "@/actions/portfolio";
 import { getTransactions } from "@/actions/transactions";
 import {
   Alert,
@@ -21,11 +21,13 @@ import {
 } from "lucide-react";
 
 export default async function DashboardPage() {
-  const [accounts, recentTransactions, balanceSummary] = await Promise.all([
+  const portfolioEnabled = process.env.PORTFOLIO_ENABLED === "true";
+  const [accounts, recentTransactions, netWorth] = await Promise.all([
     getAccounts(),
     getTransactions({ limit: 5 }),
-    getBankBalanceSummary(),
+    getNetWorthSummary(),
   ]);
+  const showInvestments = portfolioEnabled && netWorth.hasInvestments;
 
   const thisMonth = new Date();
   thisMonth.setDate(1);
@@ -54,36 +56,115 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 space-y-6">
-      {/* Total Balance Card */}
+      {/* Net Worth Card */}
       <Card className="bg-primary text-primary-foreground">
         <CardContent className="p-6">
-          <p className="text-sm opacity-80">Total Balance</p>
+          <p className="text-sm opacity-80">
+            {showInvestments ? "Net Worth" : "Total Balance"}
+          </p>
           <p className="text-3xl font-bold mt-1">
-            {balanceSummary.complete
+            {netWorth.netWorthReporting !== null
               ? formatCurrency(
-                  Number(balanceSummary.value),
-                  balanceSummary.currency
+                  Number(netWorth.netWorthReporting),
+                  netWorth.reportingCurrency
                 )
               : "Total unavailable"}
           </p>
           <p className="text-sm opacity-80 mt-2">
-            {balanceSummary.complete
-              ? `Across ${accounts.length} account${accounts.length !== 1 ? "s" : ""}`
-              : `Missing conversion to ${balanceSummary.currency}`}
+            {netWorth.netWorthReporting === null
+              ? `Missing conversion to ${netWorth.reportingCurrency}`
+              : showInvestments
+                ? "Bank cash plus investments"
+                : `Across ${accounts.length} account${accounts.length !== 1 ? "s" : ""}`}
           </p>
+          {showInvestments && (
+            <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-primary-foreground/20 pt-3 text-sm">
+              <div>
+                <dt className="opacity-80">Bank cash</dt>
+                <dd className="font-semibold tabular-nums">
+                  {netWorth.bankCashReporting !== null
+                    ? formatCurrency(
+                        Number(netWorth.bankCashReporting),
+                        netWorth.reportingCurrency
+                      )
+                    : "Unavailable"}
+                </dd>
+              </div>
+              <div>
+                <dt className="opacity-80">Investments</dt>
+                <dd className="font-semibold tabular-nums">
+                  {netWorth.investmentValueReporting !== null
+                    ? formatCurrency(
+                        Number(netWorth.investmentValueReporting),
+                        netWorth.reportingCurrency
+                      )
+                    : "Unavailable"}
+                </dd>
+              </div>
+            </dl>
+          )}
         </CardContent>
       </Card>
 
-      {!balanceSummary.complete && (
+      {!netWorth.complete && (
         <Alert>
           <CircleAlert />
-          <AlertTitle>Balance total is incomplete</AlertTitle>
+          <AlertTitle>
+            {showInvestments
+              ? "Net worth is incomplete"
+              : "Balance total is incomplete"}
+          </AlertTitle>
           <AlertDescription>
-            Add {balanceSummary.missingRates.join(", ")} in Currency settings.
+            {netWorth.missingRates.length > 0 &&
+              `Add ${netWorth.missingRates.join(", ")} in Currency settings. `}
+            {netWorth.missingQuotes.length > 0 &&
+              `Missing prices: ${netWorth.missingQuotes.join(", ")}. `}
             Account balances remain available below in their original
             currencies.
           </AlertDescription>
         </Alert>
+      )}
+
+      {showInvestments && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Investments</CardTitle>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/portfolio" className="text-primary">
+                  View Portfolio
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Holdings</dt>
+                <dd className="font-semibold tabular-nums">
+                  {netWorth.holdingsValueReporting !== null
+                    ? formatCurrency(
+                        Number(netWorth.holdingsValueReporting),
+                        netWorth.reportingCurrency
+                      )
+                    : "Unavailable"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Investment cash</dt>
+                <dd className="font-semibold tabular-nums">
+                  {netWorth.investmentCashReporting !== null
+                    ? formatCurrency(
+                        Number(netWorth.investmentCashReporting),
+                        netWorth.reportingCurrency
+                      )
+                    : "Unavailable"}
+                </dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
       )}
 
       {/* Monthly Summary */}

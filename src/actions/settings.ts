@@ -66,6 +66,9 @@ export async function getBankBalanceSummary() {
   const settings = await ensureSettings();
   const [accounts, rates] = await Promise.all([
     prisma.bankAccount.findMany({
+      // Investment cash is reported through the portfolio summary, so it is
+      // excluded here to keep net worth from counting it twice.
+      where: { kind: "STANDARD" },
       select: { balance: true, currency: true },
     }),
     prisma.exchangeRate.findMany({

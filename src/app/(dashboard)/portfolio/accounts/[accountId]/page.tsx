@@ -9,17 +9,16 @@ import { InvestmentTransactionForm } from "@/components/portfolio/investment-tra
 import { OpeningPositionForm } from "@/components/portfolio/opening-position-form";
 import { PortfolioTransferForm } from "@/components/portfolio/portfolio-transfer-form";
 import { PositionCard } from "@/components/portfolio/position-card";
+import { SignedAmount } from "@/components/portfolio/signed-amount";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatPortfolioCurrency } from "@/lib/portfolio/format";
 
 function formatCurrency(value: string | null, currency: string) {
-  if (value === null) return "Incomplete";
-  return new Intl.NumberFormat("es-PY", {
-    style: "currency",
-    currency,
+  return formatPortfolioCurrency(value, currency, {
     maximumFractionDigits: currency === "PYG" ? 0 : 8,
-  }).format(Number(value));
+  });
 }
 
 export default async function InvestmentAccountPage({
@@ -154,10 +153,10 @@ export default async function InvestmentAccountPage({
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Realized result</p>
             <p className="mt-1 text-lg font-semibold">
-              {formatCurrency(
-                detail.account.realizedGainNative,
-                detail.account.cashCurrency
-              )}
+              <SignedAmount
+                value={detail.account.realizedGainNative}
+                currency={detail.account.cashCurrency}
+              />
             </p>
           </CardContent>
         </Card>
@@ -205,6 +204,49 @@ export default async function InvestmentAccountPage({
           </div>
         )}
       </section>
+
+      {detail.account.closedPositions.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Closed positions</h2>
+          <Card>
+            <CardContent className="divide-y p-0">
+              {detail.account.closedPositions.map((closed) => (
+                <div
+                  key={closed.asset.id}
+                  className="flex flex-wrap items-center justify-between gap-3 p-4"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{closed.asset.symbol}</p>
+                      <Badge variant="secondary">{closed.asset.type}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Closed{" "}
+                      {new Intl.DateTimeFormat("es-PY", {
+                        dateStyle: "medium",
+                      }).format(new Date(closed.lastActivityDate))}
+                      {" · "}
+                      Fees{" "}
+                      {formatCurrency(
+                        closed.feesNative,
+                        closed.asset.quoteCurrency
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="text-xs text-muted-foreground">Realized</p>
+                    <SignedAmount
+                      value={closed.realizedGainNative}
+                      currency={closed.asset.quoteCurrency}
+                      className="font-medium"
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       <Card>
         <CardHeader>

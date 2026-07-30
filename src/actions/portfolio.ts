@@ -14,11 +14,16 @@ import {
   replayLedger,
   type LedgerTransactionInput,
 } from "@/lib/portfolio/calculations";
+import { buildPortfolioAllocation } from "@/lib/portfolio/allocation";
+import { composeNetWorth } from "@/lib/portfolio/net-worth";
+import { getBankBalanceSummary } from "@/actions/settings";
 import type {
   InvestmentAccountDetailDto,
   InvestmentActivityDto,
+  NetWorthSummaryDto,
   PortfolioAccountSummaryDto,
   PortfolioAssetDto,
+  PortfolioClosedPositionDto,
   PortfolioOverviewDto,
   PortfolioPositionDto,
   PortfolioTransferActivityDto,
@@ -210,6 +215,7 @@ function buildAccountSummary(
   }
 
   const positions: PortfolioPositionDto[] = [];
+  const closedPositions: PortfolioClosedPositionDto[] = [];
   let realizedGainNative = new Decimal(0);
   let realizedGainReporting = new Decimal(0);
   let dividendsNative = new Decimal(0);
@@ -228,7 +234,26 @@ function buildAccountSummary(
     dividendsReporting = dividendsReporting.plus(state.dividendsReporting);
     feesNative = feesNative.plus(state.feesNative);
     feesReporting = feesReporting.plus(state.feesReporting);
-    if (new Decimal(state.quantity).isZero()) continue;
+    if (new Decimal(state.quantity).isZero()) {
+      const lastActivity = transactions.reduce((latest, transaction) =>
+        transaction.date.getTime() >= latest.date.getTime()
+          ? transaction
+          : latest
+      );
+      closedPositions.push({
+        accountId: account.id,
+        accountName: account.name,
+        asset: serializeAsset(asset),
+        realizedGainNative: state.realizedGainNative,
+        realizedGainReporting: state.realizedGainReporting,
+        dividendsNative: state.dividendsNative,
+        dividendsReporting: state.dividendsReporting,
+        feesNative: state.feesNative,
+        feesReporting: state.feesReporting,
+        lastActivityDate: lastActivity.date.toISOString(),
+      });
+      continue;
+    }
 
     const manualQuote = asset.marketQuotes.find(
       (quote) => quote.source === "MANUAL" && quote.active
@@ -389,8 +414,13 @@ function buildAccountSummary(
     ).sort(),
     missingQuotes,
     positions,
+    closedPositions: closedPositions.sort(
+      (left, right) =>
+        Date.parse(right.lastActivityDate) - Date.parse(left.lastActivityDate)
+    ),
   };
 }
+
 
 async function loadPortfolioState() {
   const settings = await prisma.appSettings.upsert({
@@ -482,17 +512,55 @@ export async function getPortfolioOverview(): Promise<PortfolioOverviewDto> {
       ])
     : null;
 
+  const allocation = buildPortfolioAllocation(
+    activeAccounts.flatMap((account) =>
+      account.positions.map((position) => ({
+        accountId: position.accountId,
+        accountName: account.name,
+        asset: position.asset,
+        marketValueReporting: position.marketValueReporting,
+      }))
+    )
+  );
+
+  const costBasisReporting = addDecimalValues(
+    activeAccounts.flatMap((account) =>
+      account.positions.map((position) => position.remainingCostReporting)
+    )
+  );
+  const unrealizedGainReporting =
+    holdingsConversion?.complete === true
+      ? new Decimal(holdingsConversion.value)
+          .minus(costBasisReporting)
+          .toString()
+      : null;
+  const closedPositions = activeAccounts
+    .flatMap((account) => account.closedPositions)
+    .sort(
+      (left, right) =>
+        Date.parse(right.lastActivityDate) - Date.parse(left.lastActivityDate)
+    );
+
   return {
     reportingCurrency: state.settings.reportingCurrency,
     totalValueReporting,
     cashValueReporting: cashConversion.complete ? cashConversion.value : null,
     holdingsValueReporting:
       holdingsConversion?.complete === true ? holdingsConversion.value : null,
-    costBasisReporting: addDecimalValues(
-      activeAccounts.flatMap((account) =>
-        account.positions.map((position) => position.remainingCostReporting)
-      )
+    costBasisReporting,
+    unrealizedGainReporting,
+    realizedGainReporting: addDecimalValues(
+      activeAccounts.map((account) => account.realizedGainReporting)
     ),
+    dividendsReporting: addDecimalValues(
+      activeAccounts.map((account) => account.dividendsReporting)
+    ),
+    feesReporting: addDecimalValues(
+      activeAccounts.map((account) => account.feesReporting)
+    ),
+    closedPositions,
+    positionAllocation: allocation.positionAllocation,
+    assetTypeAllocation: allocation.assetTypeAllocation,
     complete,
     missingRates: Array.from(
       new Set([
@@ -507,6 +575,36 @@ export async function getPortfolioOverview(): Promise<PortfolioOverviewDto> {
     accounts: state.summaries,
     assets: state.assets.map(serializeAsset),
   };
+}
+
+/**
+ * Net worth is bank cash plus investment cash plus holdings, each counted
+ * exactly once. Bank cash excludes `INVESTMENT_CASH` accounts, which are
+ * reported through the portfolio side instead.
+ */
+export async function getNetWorthSummary(): Promise<NetWorthSummaryDto> {
+  const [bankCash, overview] = await Promise.all([
+    getBankBalanceSummary(),
+    getPortfolioOverview(),
+  ]);
+
+  return composeNetWorth({
+    reportingCurrency: overview.reportingCurrency,
+    bankCash: {
+      value: bankCash.value,
+      missingRates: bankCash.missingRates,
+    },
+    investmentCash: {
+      value: overview.cashValueReporting,
+      missingRates: overview.missingRates,
+    },
+    holdings: {
+      value: overview.holdingsValueReporting,
+      missingRates: overview.missingRates,
+    },
+    missingQuotes: overview.missingQuotes,
+    hasInvestments: overview.accounts.some((account) => !account.archivedAt),
+  });
 }
 
 export async function getInvestmentAccountDetail(

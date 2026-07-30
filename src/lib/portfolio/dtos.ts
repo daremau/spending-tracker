@@ -74,6 +74,35 @@ export type PortfolioPositionDto = {
   missingRates: string[];
 };
 
+export type PortfolioClosedPositionDto = {
+  accountId: string;
+  accountName: string;
+  asset: PortfolioAssetDto;
+  realizedGainNative: string;
+  realizedGainReporting: string;
+  dividendsNative: string;
+  dividendsReporting: string;
+  feesNative: string;
+  feesReporting: string;
+  lastActivityDate: string;
+};
+
+export type PortfolioAllocationSliceDto = {
+  key: string;
+  label: string;
+  sublabel: string;
+  value: string;
+  share: number;
+  color: string;
+};
+
+export type PortfolioAllocationDto = {
+  /** Slices only cover positions whose reporting value is complete. */
+  slices: PortfolioAllocationSliceDto[];
+  /** Symbols excluded because a quote or rate is missing. */
+  excludedSymbols: string[];
+};
+
 export type PortfolioAccountSummaryDto = PortfolioAccountOptionDto & {
   archivedAt: string | null;
   cashBalance: string;
@@ -92,6 +121,7 @@ export type PortfolioAccountSummaryDto = PortfolioAccountOptionDto & {
   missingRates: string[];
   missingQuotes: string[];
   positions: PortfolioPositionDto[];
+  closedPositions: PortfolioClosedPositionDto[];
 };
 
 export type PortfolioOverviewDto = {
@@ -100,11 +130,31 @@ export type PortfolioOverviewDto = {
   cashValueReporting: string | null;
   holdingsValueReporting: string | null;
   costBasisReporting: string;
+  unrealizedGainReporting: string | null;
+  realizedGainReporting: string;
+  dividendsReporting: string;
+  feesReporting: string;
   complete: boolean;
   missingRates: string[];
   missingQuotes: string[];
   accounts: PortfolioAccountSummaryDto[];
   assets: PortfolioAssetDto[];
+  closedPositions: PortfolioClosedPositionDto[];
+  positionAllocation: PortfolioAllocationDto;
+  assetTypeAllocation: PortfolioAllocationDto;
+};
+
+export type NetWorthSummaryDto = {
+  reportingCurrency: string;
+  bankCashReporting: string | null;
+  investmentCashReporting: string | null;
+  holdingsValueReporting: string | null;
+  investmentValueReporting: string | null;
+  netWorthReporting: string | null;
+  complete: boolean;
+  missingRates: string[];
+  missingQuotes: string[];
+  hasInvestments: boolean;
 };
 
 export type InvestmentAccountDetailDto = {

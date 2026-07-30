@@ -30,11 +30,15 @@ export default function MorePage() {
         {destinations.map((destination) => {
           const Icon = destination.icon;
           return (
-            <Link key={destination.href} href={destination.href}>
+            <Link
+              key={destination.href}
+              href={destination.href}
+              className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
               <Card className="transition-colors hover:bg-accent/50">
                 <CardContent className="flex items-center gap-3 p-4">
                   <div className="rounded-full bg-primary/10 p-2">
-                    <Icon className="h-5 w-5 text-primary" />
+                    <Icon aria-hidden="true" className="h-5 w-5 text-primary" />
                   </div>
                   <div>
                     <h2 className="font-medium">{destination.title}</h2>

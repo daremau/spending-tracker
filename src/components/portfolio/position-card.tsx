@@ -1,22 +1,18 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { PortfolioPositionDto } from "@/lib/portfolio/dtos";
+import {
+  formatPortfolioCurrency,
+  formatPortfolioQuantity,
+} from "@/lib/portfolio/format";
 import { ManualQuoteForm } from "./manual-quote-form";
 import { QuoteStatus } from "./quote-status";
+import { SignedAmount } from "./signed-amount";
 
 function formatCurrency(value: string | null, currency: string) {
-  if (value === null) return "Unavailable";
-  return new Intl.NumberFormat("es-PY", {
-    style: "currency",
-    currency,
+  return formatPortfolioCurrency(value, currency, {
     maximumFractionDigits: currency === "PYG" ? 0 : 8,
-  }).format(Number(value));
-}
-
-function formatQuantity(value: string) {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 12,
-  }).format(Number(value));
+  });
 }
 
 export function PositionCard({
@@ -26,10 +22,6 @@ export function PositionCard({
   position: PortfolioPositionDto;
   editable?: boolean;
 }) {
-  const gain = position.unrealizedGainNative
-    ? Number(position.unrealizedGainNative)
-    : null;
-
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
@@ -58,7 +50,9 @@ export function PositionCard({
         <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <div>
             <p className="text-muted-foreground">Quantity</p>
-            <p className="font-medium">{formatQuantity(position.quantity)}</p>
+            <p className="font-medium">
+              {formatPortfolioQuantity(position.quantity)}
+            </p>
           </div>
           <div>
             <p className="text-muted-foreground">Average cost</p>
@@ -80,21 +74,11 @@ export function PositionCard({
           </div>
           <div>
             <p className="text-muted-foreground">Unrealized</p>
-            <p
-              className={
-                gain === null
-                  ? "font-medium"
-                  : gain >= 0
-                    ? "font-medium text-green-600"
-                    : "font-medium text-red-500"
-              }
-            >
-              {gain !== null && gain > 0 ? "+" : ""}
-              {formatCurrency(
-                position.unrealizedGainNative,
-                position.asset.quoteCurrency
-              )}
-            </p>
+            <SignedAmount
+              value={position.unrealizedGainNative}
+              currency={position.asset.quoteCurrency}
+              className="font-medium"
+            />
           </div>
         </div>
 

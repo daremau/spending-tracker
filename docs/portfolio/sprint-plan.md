@@ -20,7 +20,7 @@ Related: [product specification](./product-spec.md) and
 
 ### Implementation status
 
-As of 2026-07-29, Sprint 1 through Sprint 4 code is complete.
+As of 2026-07-30, Sprint 1 through Sprint 5 code is complete.
 
 Sprint 1:
 
@@ -89,8 +89,38 @@ Sprint 4:
   normalization. A production build with fake server secrets passed, and those
   markers were absent from `.next/static`.
 
+Sprint 5:
+
+- The overview reports investment value, holdings, investment cash, and
+  performance, with realized result, net dividends, and recorded fees.
+- Allocation by position and by asset type uses a largest-remainder
+  distribution, so displayed shares total exactly 100%. Positions without a
+  complete reporting value are excluded from the charts and named instead of
+  being counted as zero.
+- The account filter reallocates a single-account view so its shares still
+  total 100%, and closed positions are listed with their realized result.
+- Net worth is standard bank cash plus investment cash plus holdings, each
+  counted once. `getBankBalanceSummary` now excludes `INVESTMENT_CASH`
+  accounts, and the dashboard shows the split plus a Portfolio link.
+- Desktop and mobile navigation expose Portfolio, keep it highlighted on
+  detail routes, and keep Categories and Analytics reachable under `More`.
+- Gain and loss values render through one `SignedAmount` component with an
+  arrow, an explicit sign, and an accessible label, so direction never depends
+  on color alone.
+- Seventy-eight tests pass, including new allocation, net-worth, and
+  navigation fixtures. `vitest.config.ts` now maps the `@/*` path alias.
+- A disposable PostgreSQL fixture with PYG reporting, a USD brokerage, stock,
+  ETF, high-precision crypto, and one fully sold position produced shares
+  summing to exactly 100%, net worth of PYG 68,200,255.86 equal to the sum of
+  its three parts, and PYG 21,900,000 bank cash excluding investment cash.
+  Deactivating the USD rate marked totals incomplete, emptied the charts, and
+  left every native value and unrealized result available.
+- With that fixture, `/`, `/portfolio`, `/portfolio?accountId=...`,
+  `/portfolio/accounts/[id]`, and `/more` all returned `200`, and a
+  Portfolio-enabled production build passed.
+
 Before enabling the feature in production, complete the interactive 320, 375,
-430, and 1024 CSS-pixel browser checks for Sprints 1 through 4. Automated Chrome
+430, and 1024 CSS-pixel browser checks for Sprints 1 through 5. Automated Chrome
 inspection was not available in the implementation environment.
 
 ## 2. Dependency map
