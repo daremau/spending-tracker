@@ -1,8 +1,14 @@
 import Link from "next/link";
-import { BarChart3, FileSpreadsheet, Tags } from "lucide-react";
+import { BarChart3, Bot, FileSpreadsheet, Tags } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const destinations = [
+  {
+    href: "/chat",
+    title: "Bot de transacciones",
+    description: "Screenshot o texto, revisá y cargá con etiqueta Bot",
+    icon: Bot,
+  },
   {
     href: "/categories",
     title: "Categories",

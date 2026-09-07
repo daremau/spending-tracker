@@ -6,50 +6,52 @@ import {
 } from "./nav-items";
 
 describe("getMobileNavItems", () => {
-  it("keeps five destinations when the portfolio is enabled", () => {
+  it("includes Bot and More when the portfolio is enabled", () => {
     const items = getMobileNavItems(true);
 
-    expect(items).toHaveLength(5);
     expect(items.map((item) => item.href)).toEqual([
       "/",
       "/accounts",
       "/transactions",
+      "/chat",
       "/portfolio",
       "/more",
     ]);
   });
 
-  it("keeps the previous destinations when the portfolio is disabled", () => {
+  it("includes Bot and More when the portfolio is disabled", () => {
     const items = getMobileNavItems(false);
 
     expect(items.map((item) => item.href)).toEqual([
       "/",
       "/accounts",
       "/transactions",
-      "/categories",
-      "/analytics",
+      "/chat",
+      "/more",
     ]);
     expect(items.some((item) => item.href === "/portfolio")).toBe(false);
   });
 });
 
 describe("getDesktopNavItems", () => {
-  it("puts Portfolio between transactions and the secondary items", () => {
+  it("puts Portfolio between Bot and the secondary items", () => {
     expect(getDesktopNavItems(true).map((item) => item.href)).toEqual([
       "/",
       "/accounts",
       "/transactions",
+      "/chat",
       "/portfolio",
       "/categories",
       "/analytics",
     ]);
   });
 
-  it("omits Portfolio when the feature is disabled", () => {
+  it("includes Bot and omits Portfolio when the feature is disabled", () => {
     expect(getDesktopNavItems(false).map((item) => item.href)).toEqual([
       "/",
       "/accounts",
       "/transactions",
+      "/chat",
       "/categories",
       "/analytics",
     ]);
