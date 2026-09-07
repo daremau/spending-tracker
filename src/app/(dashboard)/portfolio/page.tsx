@@ -77,6 +77,13 @@ export default async function PortfolioPage({
         assetTypeAllocation: overview.assetTypeAllocation,
       };
 
+  const canRefreshMarketData =
+    overview.accounts.some((account) => account.positions.length > 0) ||
+    overview.accounts.some(
+      (account) => account.cashCurrency !== overview.reportingCurrency
+    ) ||
+    overview.missingRates.length > 0 ||
+    overview.missingQuotes.length > 0;
   const currency = overview.reportingCurrency;
   const format = (value: string | null) =>
     formatPortfolioCurrency(value, currency);
@@ -91,7 +98,7 @@ export default async function PortfolioPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {positions.length > 0 && <RefreshMarketDataButton />}
+          {canRefreshMarketData && <RefreshMarketDataButton />}
           <AssetSearch />
           <ManualAssetForm />
           <InvestmentAccountForm />

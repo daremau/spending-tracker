@@ -235,6 +235,7 @@ export class TwelveDataProvider implements MarketDataProvider {
     }
 
     const results: AssetSearchResult[] = [];
+    const seen = new Set<string>();
     for (const value of payload.data) {
       if (!isRecord(value)) continue;
       const assetType = normalizedAssetType(value.instrument_type);
@@ -250,10 +251,17 @@ export class TwelveDataProvider implements MarketDataProvider {
           : value.exchange;
       const market =
         typeof marketValue === "string" ? marketValue.trim().toUpperCase() : "";
-      const currency =
+      const reportedCurrency =
         typeof value.currency === "string"
           ? value.currency.trim().toUpperCase()
           : "";
+      // Crypto pairs are returned with an empty currency; the quote leg of the
+      // pair symbol is the currency.
+      const currency =
+        reportedCurrency ||
+        (assetType === "CRYPTO"
+          ? (providerSymbol.split("/")[1] ?? "").trim().toUpperCase()
+          : "");
       if (
         !assetType ||
         (type && type !== assetType) ||
@@ -264,6 +272,9 @@ export class TwelveDataProvider implements MarketDataProvider {
       ) {
         continue;
       }
+      const key = `${providerSymbol.toUpperCase()}:${market}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       results.push({
         provider: "TWELVE_DATA",
         providerSymbol,

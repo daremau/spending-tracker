@@ -48,7 +48,8 @@ describe("Twelve Data provider", () => {
             instrument_name: "Bitcoin / US Dollar",
             exchange: "Coinbase",
             instrument_type: "Digital Currency",
-            currency: "USD",
+            country: "",
+            currency: "",
           },
           {
             symbol: "BAD",
@@ -77,6 +78,8 @@ describe("Twelve Data provider", () => {
     expect(results[2]).toMatchObject({
       providerSymbol: "BTC/USD",
       market: "COINBASE",
+      quoteCurrency: "USD",
+      country: null,
     });
   });
 
