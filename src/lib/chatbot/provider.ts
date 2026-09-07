@@ -2,7 +2,7 @@ import { extractResponseSchema, type ExtractResponse } from "./schemas";
 
 type ChatImage = { dataUrl: string };
 
-type ZenCredentials = {
+export type ProviderCredentials = {
   apiKey: string;
   baseUrl: string;
   model: string;
@@ -12,12 +12,12 @@ type ZenCredentials = {
 function toImageParts(images: ChatImage[]) {
   return images.slice(0, 3).map((img) => ({
     type: "image_url" as const,
-    image_url: { url: img.dataUrl, detail: "high" as const },
+    image_url: { url: img.dataUrl },
   }));
 }
 
 async function callOnce(
-  creds: Pick<ZenCredentials, "apiKey" | "baseUrl">,
+  creds: Pick<ProviderCredentials, "apiKey" | "baseUrl">,
   model: string,
   system: string,
   text: string,
@@ -63,7 +63,7 @@ async function callOnce(
 
 /** Llama al modelo principal y cae al fallback si falla. */
 export async function extractWithFallback(
-  creds: ZenCredentials,
+  creds: ProviderCredentials,
   system: string,
   text: string,
   images: ChatImage[]

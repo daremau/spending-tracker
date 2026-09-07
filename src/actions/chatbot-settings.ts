@@ -11,9 +11,9 @@ import {
 const SETTINGS_ID = "singleton";
 
 const DEFAULT_BASE_URL =
-  process.env.CHATBOT_BASE_URL ?? "https://opencode.ai/zen/v1";
-const DEFAULT_MODEL = process.env.CHATBOT_MODEL ?? "mimo-v2.5-free";
-const DEFAULT_FALLBACK = process.env.CHATBOT_FALLBACK_MODEL ?? "big-pickle";
+  process.env.CHATBOT_BASE_URL ?? "https://ollama.com/v1";
+const DEFAULT_MODEL = process.env.CHATBOT_MODEL ?? "qwen3-vl:235b-cloud";
+const DEFAULT_FALLBACK = process.env.CHATBOT_FALLBACK_MODEL ?? "gpt-oss:20b-cloud";
 
 async function ensureChatbotSettings() {
   return prisma.chatbotSettings.upsert({
@@ -85,6 +85,26 @@ export async function saveChatbotSettings(formData: FormData) {
 
   revalidatePath("/chat");
   revalidatePath("/more");
+  return { success: true };
+}
+
+/** Restaura baseUrl/modelo/fallback a los defaults del código (conserva la key). */
+export async function resetChatbotDefaults() {
+  await prisma.chatbotSettings.upsert({
+    where: { id: SETTINGS_ID },
+    update: {
+      providerBaseUrl: DEFAULT_BASE_URL,
+      model: DEFAULT_MODEL,
+      fallbackModel: DEFAULT_FALLBACK,
+    },
+    create: {
+      id: SETTINGS_ID,
+      providerBaseUrl: DEFAULT_BASE_URL,
+      model: DEFAULT_MODEL,
+      fallbackModel: DEFAULT_FALLBACK,
+    },
+  });
+  revalidatePath("/chat");
   return { success: true };
 }
 

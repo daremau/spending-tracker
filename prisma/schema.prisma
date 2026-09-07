@@ -231,9 +231,9 @@ model ChatbotMemoryRule {
 
 model ChatbotSettings {
   id              String   @id @default("singleton")
-  providerBaseUrl String   @default("https://opencode.ai/zen/v1")
-  model           String   @default("mimo-v2.5-free")
-  fallbackModel   String   @default("big-pickle")
+  providerBaseUrl String   @default("https://ollama.com/v1")
+  model           String   @default("qwen3-vl:235b-cloud")
+  fallbackModel   String   @default("gpt-oss:20b-cloud")
   encryptedKey    String?
   keyLast4        String?
   createdAt       DateTime @default(now())

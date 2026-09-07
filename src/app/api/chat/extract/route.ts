@@ -5,7 +5,7 @@ import { findMemoryMatches } from "@/actions/chatbot-memory";
 import { getAccounts } from "@/actions/accounts";
 import { getCategories } from "@/actions/categories";
 import { buildExtractionSystemPrompt } from "@/lib/chatbot/prompt";
-import { extractWithFallback } from "@/lib/chatbot/zen";
+import { extractWithFallback } from "@/lib/chatbot/provider";
 import { normalizeMerchant } from "@/lib/chatbot/normalize";
 
 const bodySchema = z.object({

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   clearChatbotKey,
+  resetChatbotDefaults,
   saveChatbotSettings,
   testChatbotConnection,
 } from "@/actions/chatbot-settings";
@@ -56,6 +57,14 @@ export function ChatbotSettingsForm({ status }: { status: ChatbotStatus }) {
     await clearChatbotKey();
   }
 
+  async function handleReset() {
+    if (!confirm("¿Volver a los defaults de Ollama Cloud? (conserva tu key)"))
+      return;
+    setLoading(true);
+    await resetChatbotDefaults();
+    setLoading(false);
+  }
+
   if (!open) {
     return (
       <div className="flex items-center gap-2 rounded-lg border p-3 text-sm">
@@ -78,9 +87,8 @@ export function ChatbotSettingsForm({ status }: { status: ChatbotStatus }) {
     >
       <div className="font-medium">Configurar chatbot IA</div>
       <p className="text-xs text-muted-foreground">
-        Usa tu API key de OpenCode Zen (OpenAI-compatible, gratis con modelos
-        free con visión). Se guarda cifrada en el servidor, nunca en el
-        navegador.
+        Usa tu API key de Ollama Cloud (creala en ollama.com/settings/keys).
+        Se guarda cifrada en el servidor, nunca en el navegador.
       </p>
       {error && (
         <div className="rounded-md bg-red-50 p-2 text-xs text-red-600 dark:bg-red-950">
@@ -98,7 +106,7 @@ export function ChatbotSettingsForm({ status }: { status: ChatbotStatus }) {
           id="providerBaseUrl"
           name="providerBaseUrl"
           defaultValue={status.providerBaseUrl}
-          placeholder="https://opencode.ai/zen/v1"
+          placeholder="https://ollama.com/v1"
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -141,6 +149,14 @@ export function ChatbotSettingsForm({ status }: { status: ChatbotStatus }) {
               disabled={testing}
             >
               {testing ? "Probando..." : "Probar conexión"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={handleReset}
+            >
+              Defaults
             </Button>
             <Button
               type="button"
