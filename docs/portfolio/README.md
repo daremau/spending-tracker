@@ -1,12 +1,23 @@
 # Investment Portfolio Documentation
 
-Status: proposed  
-Last reviewed: 2026-07-28  
+Status: implementation complete, pending interactive browser acceptance
+
+Last reviewed: 2026-07-30
+
 Target application: Spending Tracker
 
 This documentation defines the first implementation of stock, ETF, and
 cryptocurrency portfolio tracking. It is written for the current single-user
 Next.js and Prisma application.
+
+Sprint 1 provides the currency foundation, Sprint 2 provides manual investment
+accounts and opening positions, Sprint 3 provides funding and investment
+activity, Sprint 4 provides provider-backed asset search, cached prices and FX,
+protected refresh, and explicit freshness states, Sprint 5 provides allocation,
+performance, navigation, and combined net worth, and Sprint 6 provides the
+version 2 backup format, atomic restore, and release documentation. See the
+implementation status in the [sprint plan](./sprint-plan.md) for completed
+validation and remaining browser acceptance.
 
 ## Documents
 
@@ -42,6 +53,10 @@ explicitly changes them:
 
 ## MVP completion statement
 
+Every item below is implemented and verified against a disposable PostgreSQL
+database. The remaining release gate is the interactive 320, 375, 430, and 1024
+CSS-pixel browser pass, which the implementation environment could not run.
+
 The MVP is complete when a user can:
 
 1. Select a reporting currency.
@@ -54,4 +69,3 @@ The MVP is complete when a user can:
 7. Include investment value in net worth without changing income or expense
    analytics.
 8. Export and restore all portfolio data.
-

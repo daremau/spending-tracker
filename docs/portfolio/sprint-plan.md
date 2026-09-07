@@ -1,13 +1,15 @@
 # Sprint Plan: Investment Portfolio
 
-Status: proposed  
-Last reviewed: 2026-07-28  
+Status: implementation in progress
+
+Last reviewed: 2026-07-29
+
 Related: [product specification](./product-spec.md) and
 [technical specification](./technical-spec.md)
 
 ## 1. Planning assumptions
 
-- Six one-week sprints for one developer.
+- Six dependency-ordered functional sprints.
 - Each sprint is a functional vertical slice with a user-visible outcome.
 - Existing behavior remains releasable at the end of every sprint.
 - Portfolio navigation stays feature-flagged until the sprint acceptance checks
@@ -15,6 +17,145 @@ Related: [product specification](./product-spec.md) and
 - Story identifiers map to the functional requirement identifiers in the
   product specification.
 - Scope, not correctness, is reduced when a sprint is constrained.
+
+### Implementation status
+
+As of 2026-07-30, Sprint 1 through Sprint 6 code is complete.
+
+Sprint 1:
+
+- `AppSettings`, directional manual `ExchangeRate` records, and
+  `Decimal(24,8)` bank balances are implemented.
+- Currency settings and manual-rate management are available from the
+  application header.
+- The dashboard aggregate is currency-aware and becomes explicitly incomplete
+  when a required rate is missing.
+- Exact-decimal conversion and validation fixtures pass.
+- The full migration chain, default `PYG` settings seed, and balance precision
+  were verified against a disposable PostgreSQL database.
+
+Sprint 2:
+
+- Investment accounts atomically create one linked `INVESTMENT_CASH` account;
+  ordinary account and spending forms only expose `STANDARD` accounts.
+- The manual asset catalog supports normalized stocks, ETFs, and crypto pairs.
+- Opening positions support 12-decimal quantities, historical reporting FX,
+  idempotent creation, edit, delete, and complete ledger replay.
+- Active manual quotes override transaction-price fallbacks without being
+  overwritten by future provider rows.
+- Feature-flagged portfolio overview, account detail, mobile navigation, empty
+  states, and archive behavior are implemented.
+- The migration chain and the brokerage/BTC/manual-quote fixture passed against
+  a disposable PostgreSQL database. Both portfolio routes returned `200` with
+  the fixture, and a Portfolio-enabled production build passed.
+
+Sprint 3:
+
+- Funding and withdrawal flows reuse one idempotent bank `TRANSFER`, update
+  both balances atomically, appear in portfolio activity, and remain excluded
+  from income and expense analytics.
+- Buys, sells, dividends, and account- or asset-level fees validate currency,
+  replay the complete affected ledger, and apply their linked-cash effect in
+  the same serializable transaction.
+- Historical edits and deletes apply only the exact cash delta; oversells,
+  insufficient cash, and invalid later ledgers roll back without balance drift.
+- Account detail shows merged funding and investment activity plus realized
+  result, net dividends, and recorded fees.
+- The clean migration chain now includes a safe bridge for pre-existing IVA
+  Digital schema drift and portfolio-transfer idempotency.
+- The fixed USD 2,000 database fixture produced USD 1,183 cash, 9 units at
+  USD 107 average cost, and USD 136 realized gain before edit/delete checks.
+  A concurrent-buy fixture allowed exactly one valid debit, and the
+  Portfolio-enabled production build passed.
+
+Sprint 4:
+
+- Twelve Data is isolated behind a server-only provider interface with strict
+  stock, ETF, crypto, quote, and directional-FX normalization.
+- Asset search is debounced and provider selections are revalidated on the
+  server before creating or reusing an asset; manual entry remains available.
+- Manual quote and FX rows take precedence, fresh cached provider rows are
+  skipped, and only stale linked open positions and required currencies are
+  refreshed in bounded batches.
+- Quote cards and currency settings distinguish manual, fresh, stale,
+  transaction fallback, and unavailable values without describing stale data
+  as live.
+- `POST /api/cron/portfolio-quotes` uses the same refresh service as the manual
+  action and requires a timing-safe bearer-secret check.
+- Fifty provider/configuration/freshness/cron and existing domain tests pass. A
+  disposable PostgreSQL fixture verified cache writes, manual precedence,
+  transaction fallback, and cache preservation after quota failure.
+- One read-only Twelve Data demo request validated AAPL search and quote
+  normalization. A production build with fake server secrets passed, and those
+  markers were absent from `.next/static`.
+
+Sprint 5:
+
+- The overview reports investment value, holdings, investment cash, and
+  performance, with realized result, net dividends, and recorded fees.
+- Allocation by position and by asset type uses a largest-remainder
+  distribution, so displayed shares total exactly 100%. Positions without a
+  complete reporting value are excluded from the charts and named instead of
+  being counted as zero.
+- The account filter reallocates a single-account view so its shares still
+  total 100%, and closed positions are listed with their realized result.
+- Net worth is standard bank cash plus investment cash plus holdings, each
+  counted once. `getBankBalanceSummary` now excludes `INVESTMENT_CASH`
+  accounts, and the dashboard shows the split plus a Portfolio link.
+- Desktop and mobile navigation expose Portfolio, keep it highlighted on
+  detail routes, and keep Categories and Analytics reachable under `More`.
+- Gain and loss values render through one `SignedAmount` component with an
+  arrow, an explicit sign, and an accessible label, so direction never depends
+  on color alone.
+- Seventy-eight tests pass, including new allocation, net-worth, and
+  navigation fixtures. `vitest.config.ts` now maps the `@/*` path alias.
+- A disposable PostgreSQL fixture with PYG reporting, a USD brokerage, stock,
+  ETF, high-precision crypto, and one fully sold position produced shares
+  summing to exactly 100%, net worth of PYG 68,200,255.86 equal to the sum of
+  its three parts, and PYG 21,900,000 bank cash excluding investment cash.
+  Deactivating the USD rate marked totals incomplete, emptied the charts, and
+  left every native value and unrealized result available.
+- With that fixture, `/`, `/portfolio`, `/portfolio?accountId=...`,
+  `/portfolio/accounts/[id]`, and `/more` all returned `200`, and a
+  Portfolio-enabled production build passed.
+
+Sprint 6:
+
+- Backup schema version 2 covers settings, bank accounts, categories,
+  transactions with their IVA Digital parent links, manual exchange rates, the
+  asset catalog, investment accounts, investment transactions, and manual
+  quotes. Every number is serialized as text, so 8-decimal balances and
+  12-decimal quantities survive both CSV and Excel.
+- Records are referenced by natural key rather than database identifier, and
+  the CSV writer and reader now quote and unquote properly, so names holding a
+  comma or a quote round-trip unchanged.
+- Provider-fetched quotes and rates are excluded as a refetchable cache. No
+  environment variable is read during export, so no secret can reach a file.
+- Restore runs a full preflight first: identity references, transfer
+  destinations, tax-parent links, duplicate names, per-asset ledger replay for
+  oversells, and each investment cash balance against its own ledger. A failure
+  aborts before any deletion; a passing file is rewritten inside one Prisma
+  transaction.
+- Version 1 files still import and are upgraded, with their accounts read as
+  standard bank accounts.
+- 103 tests pass, including 25 covering CSV quoting, version 2 round trips in
+  both formats, version 1 compatibility, and every preflight rejection.
+- A disposable PostgreSQL fixture confirmed that the export omits the provider
+  quote and rate, that a malformed asset reference and an oversold ledger were
+  both rejected with the database bit-for-bit unchanged, and that the CSV and
+  Excel round trips reproduced identical portfolio totals, counts, and the IVA
+  Digital parent link.
+- Through the running application, `POST /api/backup` restored a version 2 file,
+  returned `400` with named errors for a corrupted one while leaving the data
+  in place, and still accepted a version 1 file. Ordinary bank workflows were
+  unaffected: `getAccounts` returns standard accounts only, funding transfers
+  stay out of income and expense totals, and a new income transaction moved
+  both the account balance and net worth by its exact amount.
+
+Before enabling the feature in production, complete the interactive 320, 375,
+430, and 1024 CSS-pixel browser checks for Sprints 1 through 6. Automated Chrome
+inspection was not available in the implementation environment. This is the
+only outstanding item in the release gate.
 
 ## 2. Dependency map
 
@@ -562,6 +703,11 @@ src/lib/market-data/*
 - Provider contract tests use recorded, sanitized fixtures.
 - One controlled live request validates configured symbols when an API key is
   available.
+- The provider remains optional: portfolio page rendering and the production
+  build complete without making a market-data request.
+- A disposable database fixture confirms that manual rows are never
+  overwritten, stale provider cache is refreshed, and quota failures preserve
+  the last valid cache.
 - The manual fallback demo succeeds with network access disabled.
 
 ### Exit gate

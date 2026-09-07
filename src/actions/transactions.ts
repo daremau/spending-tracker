@@ -16,6 +16,20 @@ type TransactionBalanceData = {
   toAccountId: string | null;
 };
 
+async function validateStandardAccounts(
+  accountId: string,
+  toAccountId: string | null
+) {
+  const ids = Array.from(
+    new Set([accountId, ...(toAccountId ? [toAccountId] : [])])
+  );
+  const accounts = await prisma.bankAccount.findMany({
+    where: { id: { in: ids }, kind: "STANDARD" },
+    select: { id: true },
+  });
+  return accounts.length === ids.length;
+}
+
 async function applyTransactionBalance(
   tx: Prisma.TransactionClient,
   data: TransactionBalanceData
@@ -173,6 +187,15 @@ export async function createTransaction(formData: FormData) {
     return { error: "Cannot transfer to the same account" };
   }
 
+  if (
+    !(await validateStandardAccounts(
+      accountId,
+      type === "TRANSFER" ? toAccountId : null
+    ))
+  ) {
+    return { error: "Choose a standard bank account" };
+  }
+
   const date = dateStr ? new Date(dateStr) : new Date();
 
   // Get digital tax category if needed
@@ -270,6 +293,15 @@ export async function updateTransaction(formData: FormData) {
     return { error: "Cannot transfer to the same account" };
   }
 
+  if (
+    !(await validateStandardAccounts(
+      accountId,
+      type === "TRANSFER" ? toAccountId : null
+    ))
+  ) {
+    return { error: "Choose a standard bank account" };
+  }
+
   const transaction = await prisma.transaction.findUnique({
     where: { id },
     include: { taxTransaction: true },
@@ -277,6 +309,13 @@ export async function updateTransaction(formData: FormData) {
 
   if (!transaction) {
     return { error: "Transaction not found" };
+  }
+
+  if (transaction.clientRequestId) {
+    return {
+      error:
+        "This portfolio transfer must be managed from its investment account.",
+    };
   }
 
   // Block editing tax transactions directly
@@ -388,6 +427,13 @@ export async function deleteTransaction(id: string) {
 
   if (!transaction) {
     return { error: "Transaction not found" };
+  }
+
+  if (transaction.clientRequestId) {
+    return {
+      error:
+        "This portfolio transfer must be managed from its investment account.",
+    };
   }
 
   // Block deleting tax transactions directly

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,10 +29,6 @@ export function CategorySection({ data, periodLabel, title }: CategorySectionPro
   const [selected, setSelected] = useState<Set<string>>(
     new Set(data.map((item) => item.name))
   );
-
-  useEffect(() => {
-    setSelected(new Set(data.map((item) => item.name)));
-  }, [data]);
 
   const handleToggle = (name: string, checked: boolean | "indeterminate") => {
     setSelected((prev) => {

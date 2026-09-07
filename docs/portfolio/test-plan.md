@@ -1,7 +1,9 @@
 # Test Plan: Investment Portfolio
 
-Status: proposed  
-Last reviewed: 2026-07-28  
+Status: implementation in progress
+
+Last reviewed: 2026-07-29
+
 Related: [technical specification](./technical-spec.md) and
 [sprint plan](./sprint-plan.md)
 
@@ -318,6 +320,7 @@ serializable transaction or conditional balance update.
 
 - Transfer between a standard and investment-cash account.
 - Confirm two balance changes and one transfer record.
+- Repeat the same `clientRequestId` and confirm neither balance changes again.
 - Confirm analytics exclude it.
 
 ### DB-010: Archive behavior

@@ -6,6 +6,7 @@ import { amountToNumber } from "@/lib/format";
 
 export async function getAccounts() {
   const accounts = await prisma.bankAccount.findMany({
+    where: { kind: "STANDARD" },
     orderBy: { createdAt: "desc" },
   });
 
@@ -16,8 +17,8 @@ export async function getAccounts() {
 }
 
 export async function getAccountById(id: string) {
-  const account = await prisma.bankAccount.findUnique({
-    where: { id },
+  const account = await prisma.bankAccount.findFirst({
+    where: { id, kind: "STANDARD" },
   });
 
   if (!account) return null;
@@ -58,10 +59,13 @@ export async function updateAccount(id: string, formData: FormData) {
     return { error: "Account name is required" };
   }
 
-  await prisma.bankAccount.update({
-    where: { id },
+  const result = await prisma.bankAccount.updateMany({
+    where: { id, kind: "STANDARD" },
     data: { name, currency },
   });
+  if (result.count === 0) {
+    return { error: "Bank account not found" };
+  }
 
   revalidatePath("/accounts");
   revalidatePath("/");
@@ -69,9 +73,15 @@ export async function updateAccount(id: string, formData: FormData) {
 }
 
 export async function deleteAccount(id: string) {
-  await prisma.bankAccount.delete({
+  const account = await prisma.bankAccount.findUnique({
     where: { id },
+    select: { kind: true },
   });
+  if (!account || account.kind !== "STANDARD") {
+    return { error: "Investment cash accounts are managed from Portfolio" };
+  }
+
+  await prisma.bankAccount.delete({ where: { id } });
 
   revalidatePath("/accounts");
   revalidatePath("/");

@@ -1,7 +1,9 @@
 # Technical Specification: Investment Portfolio
 
-Status: proposed  
-Last reviewed: 2026-07-28  
+Status: implementation in progress
+
+Last reviewed: 2026-07-29
+
 Related: [product specification](./product-spec.md)
 
 ## 1. Current application constraints
@@ -9,12 +11,12 @@ Related: [product specification](./product-spec.md)
 The implementation must fit the existing architecture:
 
 - Next.js 16 App Router and React 19.
-- Prisma 5 with PostgreSQL.
+- Prisma 6 with PostgreSQL.
 - Server actions under `src/actions`.
 - Zod and React Hook Form for input validation.
 - Recharts for data visualization.
 - Atomic balance changes through `prisma.$transaction`.
-- `Decimal(12,2)` bank and transaction amounts.
+- `Decimal(24,8)` bank balances and `Decimal(12,2)` cash transactions.
 - No user or authentication model.
 - CSV and Excel backup can replace the complete local dataset.
 
@@ -95,6 +97,12 @@ precision.
 
 This design reuses the current atomic `TRANSFER` behavior for portfolio funding
 and avoids duplicating cash balances in the investment domain.
+
+Portfolio-originated `Transaction` rows store an optional unique
+`clientRequestId`. Ordinary income, expense, and transfer rows leave it null.
+The funding action uses the key to return the prior equivalent transfer without
+applying either balance effect twice; ordinary transaction edit/delete actions
+reject these managed portfolio transfers.
 
 ### 3.3 Investment account
 
@@ -491,8 +499,12 @@ An incomplete total is never displayed as if it were complete.
 ```ts
 interface MarketDataProvider {
   searchAssets(query: string, type?: AssetType): Promise<AssetSearchResult[]>;
-  getQuotes(assets: ProviderAssetRef[]): Promise<ProviderQuote[]>;
-  getExchangeRates(pairs: CurrencyPair[]): Promise<ProviderExchangeRate[]>;
+  getQuotes(
+    assets: ProviderAssetRef[]
+  ): Promise<ProviderBatchResult<ProviderQuote>>;
+  getExchangeRates(
+    pairs: CurrencyPair[]
+  ): Promise<ProviderBatchResult<ProviderExchangeRate>>;
 }
 ```
 
@@ -534,6 +546,12 @@ Refresh only assets held in open positions:
 8. Return per-symbol successes and failures.
 
 Do not erase the last valid quote on provider failure.
+
+The implemented freshness windows are 24 hours for stocks and ETFs, 15 minutes
+for cryptocurrencies, and 24 hours for FX. Refresh eligibility uses the cache
+fetch timestamp, while the UI displays freshness from the provider observation
+timestamp. Requests use Twelve Data's `Authorization: apikey ...` header and
+groups of at most eight symbols.
 
 ### Trigger paths
 
@@ -640,27 +658,48 @@ manualQuotes
 manualExchangeRates
 ```
 
-Cached Twelve Data quotes and daily snapshots are reproducible and may be
-excluded.
+Cached Twelve Data quotes and daily snapshots are reproducible and are
+excluded. Nothing in the export path reads an environment variable, so a backup
+cannot contain a provider secret.
+
+Records reference each other by natural key rather than database identifier, so
+a restore can rebuild the graph on a fresh database:
+
+```text
+bank account        name
+category            name + type
+asset               type + symbol + market
+investment account  name
+transaction         export-assigned key, used only by its digital-tax child
+```
+
+Every numeric field is serialized as text. Bank balances are `Decimal(24,8)`
+and investment quantities are `Decimal(30,12)`; a JavaScript number or a
+numeric spreadsheet cell would silently drop digits from both.
 
 Import order:
 
-1. Parse and validate the entire file.
-2. Validate version compatibility.
-3. Start one Prisma transaction.
-4. Clear child tables before parent tables.
-5. Restore settings and categories.
-6. Restore standard and investment-cash bank accounts.
-7. Restore investment accounts and relations.
-8. Restore assets.
-9. Restore existing cash transactions.
-10. Restore investment transactions.
-11. Restore manual quotes and FX.
-12. Replay portfolio and cash invariants.
-13. Commit.
+1. Parse the entire file and detect its version.
+2. Reject a version newer than this application supports.
+3. Preflight the complete parsed backup, with **no** database writes:
+   identity uniqueness, every reference, transfer destinations, digital-tax
+   parent links, per-asset ledger replay for oversells, and each investment
+   cash balance against its own ledger.
+4. Abort on any preflight error, leaving the database untouched.
+5. Start one Prisma transaction.
+6. Clear child tables before parent tables.
+7. Restore settings, bank accounts, categories, and manual FX.
+8. Restore transactions, parents before digital-tax children.
+9. Restore assets, then investment accounts, then investment transactions.
+10. Restore manual quotes.
+11. Commit; any failure rolls the whole restore back.
 
-The current importer deletes records before all semantic validation is known.
-Version 2 import must perform preflight validation before any delete operation.
+Invariant replay runs in step 3 rather than inside the transaction. Version 1
+deleted records before all semantic validation was known; validating first is
+what makes a rejected import a no-op.
+
+Version 1 files remain importable and are upgraded on read: their accounts are
+treated as `STANDARD` and their transactions receive synthetic keys.
 
 ## 10. Security and privacy
 
@@ -721,9 +760,13 @@ src/components/forms/transaction-form.tsx
 src/components/layout/mobile-nav.tsx
 src/components/layout/nav-items.ts
 src/components/layout/sidebar.tsx
-src/lib/backup.ts
+src/lib/backup/
 package.json
 ```
+
+`src/lib/backup.ts` was replaced by `src/lib/backup/`, which separates the
+version 2 types, the CSV primitives, the database reader, the serializers, the
+parser, the preflight validator, and the restore writer.
 
 ## 13. Migration and rollout
 
