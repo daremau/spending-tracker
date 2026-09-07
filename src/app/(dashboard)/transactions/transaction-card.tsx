@@ -48,6 +48,7 @@ interface TransactionCardProps {
       color: string;
     } | null;
     isDigitalTax?: boolean;
+    source?: "MANUAL" | "CHATBOT" | "IMPORT";
     taxTransaction?: { id: string; amount: number } | null;
   };
   accounts: Account[];
@@ -154,6 +155,14 @@ export function TransactionCard({
                     className="text-xs shrink-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                   >
                     IVA Digital
+                  </Badge>
+                )}
+                {transaction.source === "CHATBOT" && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs shrink-0 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                  >
+                    Bot
                   </Badge>
                 )}
               </div>

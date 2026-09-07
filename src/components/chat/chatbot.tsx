@@ -162,7 +162,17 @@ export function Chatbot({
     setConfirming(true);
     try {
       const result = await createChatbotTransactions(
-        drafts.map(({ key: _k, memoryApplied: _m, ...rest }) => rest)
+        drafts.map((d) => ({
+          merchant: d.merchant,
+          amount: d.amount,
+          date: d.date,
+          type: d.type,
+          categoryId: d.categoryId,
+          accountId: d.accountId,
+          toAccountId: d.toAccountId,
+          description: d.description,
+          applyDigitalTax: d.applyDigitalTax,
+        }))
       );
       if (result?.error) throw new Error(result.error);
       setLastCount(result.count ?? drafts.length);
