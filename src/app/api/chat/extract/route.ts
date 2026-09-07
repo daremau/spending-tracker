@@ -142,6 +142,12 @@ export async function POST(req: Request) {
   } catch (e) {
     const message =
       e instanceof Error ? e.message : "Falló la extracción";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json(
+      {
+        error: message,
+        model: `${creds.model} (fallback: ${creds.fallbackModel})`,
+      },
+      { status: 502 }
+    );
   }
 }

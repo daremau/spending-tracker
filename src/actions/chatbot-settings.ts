@@ -12,8 +12,8 @@ const SETTINGS_ID = "singleton";
 
 const DEFAULT_BASE_URL =
   process.env.CHATBOT_BASE_URL ?? "https://ollama.com/v1";
-const DEFAULT_MODEL = process.env.CHATBOT_MODEL ?? "qwen3-vl:235b-cloud";
-const DEFAULT_FALLBACK = process.env.CHATBOT_FALLBACK_MODEL ?? "gpt-oss:20b-cloud";
+const DEFAULT_MODEL = process.env.CHATBOT_MODEL ?? "gemma4:31b-cloud";
+const DEFAULT_FALLBACK = process.env.CHATBOT_FALLBACK_MODEL ?? "gemma4:cloud";
 
 async function ensureChatbotSettings() {
   return prisma.chatbotSettings.upsert({
