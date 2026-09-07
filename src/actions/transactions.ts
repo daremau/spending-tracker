@@ -86,8 +86,9 @@ export async function getTransactions(options?: {
   limit?: number;
   accountId?: string;
   month?: string;
+  source?: "MANUAL" | "CHATBOT" | "IMPORT" | "ALL";
 }) {
-  const { limit, accountId, month } = options || {};
+  const { limit, accountId, month, source } = options || {};
   const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month ?? "");
   const monthStart = monthMatch
     ? new Date(`${monthMatch[1]}-${monthMatch[2]}-01T00:00:00.000Z`)
@@ -104,6 +105,7 @@ export async function getTransactions(options?: {
 
   const transactions = await prisma.transaction.findMany({
     where: {
+      ...(source && source !== "ALL" ? { source } : {}),
       ...(accountId
         ? {
             OR: [{ accountId }, { toAccountId: accountId }],
@@ -141,13 +143,19 @@ export async function getTransactions(options?: {
   }));
 }
 
-export async function getTransactionMonths(accountId?: string) {
+export async function getTransactionMonths(
+  accountId?: string,
+  source?: "MANUAL" | "CHATBOT" | "IMPORT" | "ALL"
+) {
   const transactions = await prisma.transaction.findMany({
-    where: accountId
-      ? {
-          OR: [{ accountId }, { toAccountId: accountId }],
-        }
-      : undefined,
+    where: {
+      ...(source && source !== "ALL" ? { source } : {}),
+      ...(accountId
+        ? {
+            OR: [{ accountId }, { toAccountId: accountId }],
+          }
+        : {}),
+    },
     select: { date: true },
     orderBy: { date: "desc" },
   });
