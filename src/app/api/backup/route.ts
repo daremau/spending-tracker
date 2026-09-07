@@ -1,6 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { parseCSV, parseExcel, restoreBackup } from "@/lib/backup";
+import {
+  collectBackup,
+  exportToCSV,
+  exportToExcel,
+  parseCSV,
+  parseExcel,
+  restoreBackup,
+} from "@/lib/backup";
+
+export const dynamic = "force-dynamic";
+
+function exportFilename(extension: string) {
+  return `backup-v2-${new Date().toISOString().split("T")[0]}.${extension}`;
+}
+
+// Export is a read, so it is served over GET (a plain file download).
+// The previous Server Action flight-POST never reached the server through
+// some preview proxies, surfacing only as "Failed to export backup".
+export async function GET(request: NextRequest) {
+  try {
+    const format =
+      new URL(request.url).searchParams.get("format")?.toLowerCase() ===
+      "excel"
+        ? "excel"
+        : "csv";
+    const backup = await collectBackup();
+
+    if (format === "excel") {
+      const buffer = await exportToExcel(backup);
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="${exportFilename("xlsx")}"`,
+        },
+      });
+    }
+
+    return new NextResponse(exportToCSV(backup), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${exportFilename("csv")}"`,
+      },
+    });
+  } catch (error) {
+    console.error("Export error:", error);
+    return NextResponse.json(
+      { error: "Failed to export backup" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

@@ -89,7 +89,7 @@ export function ImportPanel({ onClose }: { onClose: () => void }) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Import failed");
+        setError(data.errors?.join("\n") || data.error || "Import failed");
       } else if (!data.success) {
         setError(data.errors?.join("\n") || "Import failed");
       } else {

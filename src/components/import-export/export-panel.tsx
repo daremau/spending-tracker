@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FileText, FileSpreadsheet, Loader2 } from "lucide-react";
-import { exportBackupCSV, exportBackupExcel } from "@/actions/backup";
 
 export function ExportPanel({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState<"csv" | "excel" | null>(null);
@@ -15,17 +14,38 @@ export function ExportPanel({ onClose }: { onClose: () => void }) {
     setError(null);
 
     try {
-      const result = format === "csv" ? await exportBackupCSV() : await exportBackupExcel();
+      const response = await fetch(`/api/backup?format=${format}`, {
+        method: "GET",
+      });
 
-      if ("error" in result) {
-        setError(result.error);
-      } else {
-        const link = document.createElement("a");
-        link.href = `data:application/${format === "csv" ? "csv" : "vnd.openxmlformats-officedocument.spreadsheetml.sheet"};base64,${result.data}`;
-        link.download = result.filename;
-        link.click();
-        onClose();
+      if (!response.ok) {
+        let message = "Failed to export backup";
+        try {
+          const data = await response.json();
+          message =
+            data.error || data.errors?.join("\n") || message;
+        } catch {
+          // Non-JSON error body: keep the generic message.
+        }
+        setError(message);
+        return;
       }
+
+      const blob = await response.blob();
+      const disposition =
+        response.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      const filename =
+        match?.[1] ?? (format === "csv" ? "backup.csv" : "backup.xlsx");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      onClose();
     } catch {
       setError("Failed to export backup");
     } finally {
