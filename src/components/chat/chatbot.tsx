@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bot, ImagePlus, Loader2, Send, X } from "lucide-react";
+import { Bot, ImagePlus, Loader2, Plus, Send, X } from "lucide-react";
 import { createChatbotTransactions } from "@/actions/chatbot";
 import {
   DraftReviewTable,
@@ -14,6 +14,11 @@ import {
 } from "./draft-review-table";
 
 type Msg = { role: "user" | "bot"; text: string };
+
+const INITIAL_MESSAGE: Msg = {
+  role: "bot",
+  text: "Hola 👋 Mándame un screenshot o escribí ej. “Biggie 45.000 ayer”. Te muestro la lista para revisar antes de cargar.",
+};
 
 async function fileToDataUrl(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file).catch(() => null);
@@ -51,12 +56,7 @@ export function Chatbot({
   defaultAccountId: string | null;
   memoryCount: number;
 }) {
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: "bot",
-      text: "Hola 👋 Mándame un screenshot o escribí ej. “Biggie 45.000 ayer”. Te muestro la lista para revisar antes de cargar.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([INITIAL_MESSAGE]);
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<UIDraft[]>([]);
@@ -72,6 +72,20 @@ export function Chatbot({
 
   function removeDraft(key: string) {
     setDrafts((prev) => prev.filter((d) => d.key !== key));
+  }
+
+  function handleNewChat() {
+    const hasContent =
+      messages.length > 1 || drafts.length > 0 || images.length > 0;
+    if (hasContent && !confirm("¿Empezar un nuevo chat? Se borra la conversación actual.")) {
+      return;
+    }
+    setMessages([INITIAL_MESSAGE]);
+    setText("");
+    setImages([]);
+    setDrafts([]);
+    setError(null);
+    setLastCount(null);
   }
 
   async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -203,6 +217,18 @@ export function Chatbot({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          onClick={handleNewChat}
+          disabled={extracting || confirming}
+        >
+          <Plus className="h-4 w-4" />
+          Nuevo chat
+        </Button>
+      </div>
       <div className="space-y-2">
         {messages.map((m, i) => (
           <div
