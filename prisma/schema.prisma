@@ -172,15 +172,22 @@ enum CategoryType {
   EXPENSE
 }
 
+enum TransactionSource {
+  MANUAL
+  CHATBOT
+  IMPORT
+}
+
 model Transaction {
-  id              String          @id @default(cuid())
-  clientRequestId String?         @unique
+  id              String            @id @default(cuid())
+  clientRequestId String?           @unique
   type            TransactionType
-  amount          Decimal         @db.Decimal(12, 2)
+  source          TransactionSource @default(MANUAL)
+  amount          Decimal           @db.Decimal(12, 2)
   description     String?
-  date            DateTime        @default(now())
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  date            DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   accountId String
   account   BankAccount @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: Cascade)
@@ -200,10 +207,35 @@ model Transaction {
   @@index([accountId])
   @@index([date])
   @@index([parentTransactionId])
+  @@index([source])
 }
 
 enum TransactionType {
   INCOME
   EXPENSE
   TRANSFER
+}
+
+model ChatbotMemoryRule {
+  id          String          @id @default(cuid())
+  merchantKey String          @unique
+  merchantRaw String
+  type        TransactionType
+  categoryId  String?
+  accountId   String?
+  toAccountId String?
+  hits        Int             @default(1)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model ChatbotSettings {
+  id              String   @id @default("singleton")
+  providerBaseUrl String   @default("https://ollama.com/v1")
+  model           String   @default("gemma4:31b-cloud")
+  fallbackModel   String   @default("gemma4:cloud")
+  encryptedKey    String?
+  keyLast4        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

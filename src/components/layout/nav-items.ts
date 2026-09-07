@@ -5,6 +5,7 @@ import {
   Tags,
   BarChart3,
   BriefcaseBusiness,
+  Bot,
   Menu,
   type LucideIcon,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const baseNavItems: NavItem[] = [
   { href: "/", label: "Home", icon: LayoutDashboard },
   { href: "/accounts", label: "Accounts", icon: Wallet },
   { href: "/transactions", label: "Txns", icon: ArrowLeftRight },
+  { href: "/chat", label: "Bot", icon: Bot },
 ];
 
 const secondaryNavItems: NavItem[] = [
@@ -43,7 +45,7 @@ export function getMobileNavItems(portfolioEnabled: boolean): NavItem[] {
         { href: "/portfolio", label: "Portfolio", icon: BriefcaseBusiness },
         { href: "/more", label: "More", icon: Menu },
       ]
-    : [...baseNavItems, ...secondaryNavItems];
+    : [...baseNavItems, { href: "/more", label: "More", icon: Menu }];
 }
 
 export function isNavActive(href: string, pathname: string) {

@@ -30,6 +30,23 @@ async function validateStandardAccounts(
   return accounts.length === ids.length;
 }
 
+type ManagedTransferCheck = {
+  clientRequestId: string | null;
+  account: { kind: "STANDARD" | "INVESTMENT_CASH" };
+  toAccount: { kind: "STANDARD" | "INVESTMENT_CASH" } | null;
+};
+
+// Only portfolio funding/withdrawals (TRANSFER touching an INVESTMENT_CASH
+// account) are managed from Portfolio. Chatbot/import rows also carry a
+// clientRequestId for idempotency but must remain editable here.
+function isManagedPortfolioTransfer(transaction: ManagedTransferCheck) {
+  if (!transaction.clientRequestId) return false;
+  return (
+    transaction.account.kind === "INVESTMENT_CASH" ||
+    transaction.toAccount?.kind === "INVESTMENT_CASH"
+  );
+}
+
 async function applyTransactionBalance(
   tx: Prisma.TransactionClient,
   data: TransactionBalanceData
@@ -86,8 +103,9 @@ export async function getTransactions(options?: {
   limit?: number;
   accountId?: string;
   month?: string;
+  source?: "MANUAL" | "CHATBOT" | "IMPORT" | "ALL";
 }) {
-  const { limit, accountId, month } = options || {};
+  const { limit, accountId, month, source } = options || {};
   const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month ?? "");
   const monthStart = monthMatch
     ? new Date(`${monthMatch[1]}-${monthMatch[2]}-01T00:00:00.000Z`)
@@ -104,6 +122,7 @@ export async function getTransactions(options?: {
 
   const transactions = await prisma.transaction.findMany({
     where: {
+      ...(source && source !== "ALL" ? { source } : {}),
       ...(accountId
         ? {
             OR: [{ accountId }, { toAccountId: accountId }],
@@ -141,13 +160,19 @@ export async function getTransactions(options?: {
   }));
 }
 
-export async function getTransactionMonths(accountId?: string) {
+export async function getTransactionMonths(
+  accountId?: string,
+  source?: "MANUAL" | "CHATBOT" | "IMPORT" | "ALL"
+) {
   const transactions = await prisma.transaction.findMany({
-    where: accountId
-      ? {
-          OR: [{ accountId }, { toAccountId: accountId }],
-        }
-      : undefined,
+    where: {
+      ...(source && source !== "ALL" ? { source } : {}),
+      ...(accountId
+        ? {
+            OR: [{ accountId }, { toAccountId: accountId }],
+          }
+        : {}),
+    },
     select: { date: true },
     orderBy: { date: "desc" },
   });
@@ -304,23 +329,27 @@ export async function updateTransaction(formData: FormData) {
 
   const transaction = await prisma.transaction.findUnique({
     where: { id },
-    include: { taxTransaction: true },
+    include: {
+      taxTransaction: true,
+      account: { select: { kind: true } },
+      toAccount: { select: { kind: true } },
+    },
   });
 
   if (!transaction) {
     return { error: "Transaction not found" };
   }
 
-  if (transaction.clientRequestId) {
+  // Block editing tax transactions directly
+  if (transaction.isDigitalTax) {
+    return { error: "No se puede editar transacciones de IVA directamente. Edita la transacción original." };
+  }
+
+  if (isManagedPortfolioTransfer(transaction)) {
     return {
       error:
         "This portfolio transfer must be managed from its investment account.",
     };
-  }
-
-  // Block editing tax transactions directly
-  if (transaction.isDigitalTax) {
-    return { error: "No se puede editar transacciones de IVA directamente. Edita la transacción original." };
   }
 
   const date = dateStr ? new Date(dateStr) : new Date();
@@ -422,23 +451,27 @@ export async function updateTransaction(formData: FormData) {
 export async function deleteTransaction(id: string) {
   const transaction = await prisma.transaction.findUnique({
     where: { id },
-    include: { taxTransaction: true },
+    include: {
+      taxTransaction: true,
+      account: { select: { kind: true } },
+      toAccount: { select: { kind: true } },
+    },
   });
 
   if (!transaction) {
     return { error: "Transaction not found" };
   }
 
-  if (transaction.clientRequestId) {
+  // Block deleting tax transactions directly
+  if (transaction.isDigitalTax) {
+    return { error: "No se puede eliminar transacciones de IVA directamente. Elimina la transacción original." };
+  }
+
+  if (isManagedPortfolioTransfer(transaction)) {
     return {
       error:
         "This portfolio transfer must be managed from its investment account.",
     };
-  }
-
-  // Block deleting tax transactions directly
-  if (transaction.isDigitalTax) {
-    return { error: "No se puede eliminar transacciones de IVA directamente. Elimina la transacción original." };
   }
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {

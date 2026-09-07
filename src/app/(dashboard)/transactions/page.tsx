@@ -10,13 +10,21 @@ import { TransactionForm } from "@/components/forms/transaction-form";
 import { TransactionCard } from "./transaction-card";
 import { AccountFilter } from "./account-filter";
 import { MonthFilter } from "./month-filter";
+import { SourceFilter } from "./source-filter";
+
+const VALID_SOURCES = ["MANUAL", "CHATBOT", "IMPORT"] as const;
 
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ accountId?: string; month?: string }>;
+  searchParams: Promise<{ accountId?: string; month?: string; source?: string }>;
 }) {
-  const { accountId, month } = await searchParams;
+  const { accountId, month, source } = await searchParams;
+  const sourceFilter = VALID_SOURCES.includes(
+    (source ?? "") as (typeof VALID_SOURCES)[number]
+  )
+    ? (source as (typeof VALID_SOURCES)[number])
+    : undefined;
 
   const [
     transactions,
@@ -26,8 +34,8 @@ export default async function TransactionsPage({
     expenseCategories,
   ] =
     await Promise.all([
-      getTransactions({ accountId, month }),
-      getTransactionMonths(accountId),
+      getTransactions({ accountId, month, source: sourceFilter ?? "ALL" }),
+      getTransactionMonths(accountId, sourceFilter ?? "ALL"),
       getAccounts(),
       getCategories("INCOME"),
       getCategories("EXPENSE"),
@@ -46,6 +54,7 @@ export default async function TransactionsPage({
         <div className="flex flex-wrap items-center gap-2">
           <AccountFilter accounts={accounts} />
           <MonthFilter months={transactionMonths} />
+          <SourceFilter />
           <TransactionForm
             accounts={accounts}
             incomeCategories={incomeCategories}
