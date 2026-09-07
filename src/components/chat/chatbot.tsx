@@ -116,8 +116,18 @@ export function Chatbot({
         drafts?: UIDraft[];
         error?: string;
         model?: string;
+        degraded?: boolean;
       };
       if (!res.ok) throw new Error(json.error ?? "Falló la extracción");
+      if (json.degraded) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "bot",
+            text: "⚠️ No pude leer la imagen con el modelo de visión, así que procesé solo tu texto. Dictame lo que falte (ej. Biggie 45.000).",
+          },
+        ]);
+      }
       const incoming: UIDraft[] = (json.drafts ?? []).map((d) => ({
         ...d,
         key: crypto.randomUUID(),

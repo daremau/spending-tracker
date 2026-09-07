@@ -99,36 +99,43 @@ function tryParse(s: string): unknown | undefined {
   }
 }
 
-/** Llama al modelo principal y cae al fallback si falla. */
+/**
+ * Llama al modelo principal (visión) y cae al fallback si falla.
+ * Si había imágenes, el fallback de texto no las acepta: reintenta
+ * SOLO con el texto y marca `degraded` para que la UI pida al usuario
+ * que dicte las transacciones en texto. Si no hay texto, lanza el error
+ * del primario con guía para reintentar en modo texto.
+ */
 export async function extractWithFallback(
   creds: ProviderCredentials,
   system: string,
   text: string,
   images: ChatImage[]
-): Promise<{ result: ExtractResponse; model: string }> {
+): Promise<{ result: ExtractResponse; model: string; degraded: boolean }> {
   let primaryError: unknown = null;
   try {
     const result = await callOnce(creds, creds.model, system, text, images);
-    return { result, model: creds.model };
+    return { result, model: creds.model, degraded: false };
   } catch (e) {
     primaryError = e;
   }
-  if (!creds.fallbackModel || creds.fallbackModel === creds.model) {
+  const fallback = creds.fallbackModel;
+  if (!fallback || fallback === creds.model) {
     throw primaryError;
   }
-  try {
-    const result = await callOnce(
-      creds,
-      creds.fallbackModel,
-      system,
-      text,
-      images
+  if (images.length > 0 && !text.trim()) {
+    throw new Error(
+      `Visión (${creds.model}): ${messageOf(primaryError)} — describime la transacción en texto (ej. Biggie 45.000)`
     );
-    return { result, model: creds.fallbackModel };
+  }
+  try {
+    // Sin imágenes: el fallback de texto las rechazaría con 400.
+    const result = await callOnce(creds, fallback, system, text, []);
+    return { result, model: fallback, degraded: images.length > 0 };
   } catch (fallbackError) {
     // Encadena ambos errores para no tapar la causa real del primario.
     throw new Error(
-      `Primario (${creds.model}): ${messageOf(primaryError)} | Fallback (${creds.fallbackModel}): ${messageOf(fallbackError)}`
+      `Primario (${creds.model}): ${messageOf(primaryError)} | Fallback (${fallback}): ${messageOf(fallbackError)}`
     );
   }
 }

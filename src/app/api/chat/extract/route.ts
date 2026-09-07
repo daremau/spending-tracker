@@ -78,7 +78,7 @@ export async function POST(req: Request) {
   });
 
   try {
-    const { result, model } = await extractWithFallback(
+    const { result, model, degraded } = await extractWithFallback(
       creds,
       system,
       text,
@@ -138,7 +138,7 @@ export async function POST(req: Request) {
       };
     });
 
-    return NextResponse.json({ drafts, model });
+    return NextResponse.json({ drafts, model, degraded });
   } catch (e) {
     const message =
       e instanceof Error ? e.message : "Falló la extracción";
