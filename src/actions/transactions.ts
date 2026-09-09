@@ -186,6 +186,23 @@ export async function getTransactionMonths(
   );
 }
 
+export async function getTransactionYears() {
+  const transactions = await prisma.transaction.findMany({
+    select: { date: true },
+    orderBy: { date: "desc" },
+  });
+
+  return Array.from(
+    new Set(
+      transactions.map((transaction) =>
+        Number(transaction.date.toISOString().slice(0, 4))
+      )
+    )
+  )
+    .filter((year) => Number.isFinite(year))
+    .sort((a, b) => b - a);
+}
+
 export async function createTransaction(formData: FormData) {
   const type = formData.get("type") as TransactionType;
   const amount = amountToNumber(formData.get("amount") as string);

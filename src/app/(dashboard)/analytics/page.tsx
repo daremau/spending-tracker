@@ -1,37 +1,25 @@
 export const dynamic = 'force-dynamic';
 
 import { prisma } from "@/lib/prisma";
+import { getTransactionYears } from "@/actions/transactions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BalanceChart } from "@/components/charts/balance-chart";
-import { addMonths, format, startOfMonth, startOfYear, subMonths } from "date-fns";
+import { addMonths, format, startOfMonth } from "date-fns";
 import {
-  AnalyticsPeriod,
+  AnalyticsFilter,
   DEFAULT_PERIOD,
-  PERIOD_OPTIONS,
   getPeriodLabel,
+  isAnalyticsPeriod,
+  parseYearParam,
+  resolveDateRange,
 } from "./periods";
 import { PeriodSwitcher } from "./period-switcher";
 import { CategorySection } from "./category-section";
 import { PivotTable, type PivotRow } from "./pivot-table";
 
-function getDateRange(period: AnalyticsPeriod, now: Date) {
-  switch (period) {
-    case "month":
-      return { start: startOfMonth(now), end: now };
-    case "3m":
-      return { start: startOfMonth(subMonths(now, 2)), end: now };
-    case "6m":
-      return { start: startOfMonth(subMonths(now, 5)), end: now };
-    case "year":
-      return { start: startOfYear(now), end: now };
-    default:
-      return { start: undefined, end: now };
-  }
-}
-
-async function getAnalyticsData(period: AnalyticsPeriod) {
+async function getAnalyticsData(filter: AnalyticsFilter) {
   const now = new Date();
-  const { start, end } = getDateRange(period, now);
+  const { start, end } = resolveDateRange(filter, now);
   const dateFilter = start ? { gte: start, lte: end } : undefined;
 
   const [spendingByCategory, incomeByCategory, categories] = await Promise.all([
@@ -187,34 +175,49 @@ async function getAnalyticsData(period: AnalyticsPeriod) {
     totalIncome,
     totalExpense,
     netSavings: totalIncome - totalExpense,
-    periodLabel: getPeriodLabel(period),
+    periodLabel: getPeriodLabel(filter, now),
   };
 }
 
 interface AnalyticsPageProps {
   searchParams?: Promise<{
     period?: string;
+    year?: string;
+    from?: string;
+    to?: string;
   }>;
 }
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
   const resolvedSearchParams = await searchParams;
-  const periodParam =
-    (resolvedSearchParams?.period as AnalyticsPeriod) ?? DEFAULT_PERIOD;
-  const period = PERIOD_OPTIONS.some((option) => option.value === periodParam)
-    ? periodParam
-    : DEFAULT_PERIOD;
+  const rawPeriod = resolvedSearchParams?.period;
+  const period = isAnalyticsPeriod(rawPeriod) ? rawPeriod : DEFAULT_PERIOD;
+  const filter: AnalyticsFilter = {
+    period,
+    year: parseYearParam(resolvedSearchParams?.year),
+    from:
+      typeof resolvedSearchParams?.from === "string"
+        ? resolvedSearchParams.from
+        : undefined,
+    to:
+      typeof resolvedSearchParams?.to === "string"
+        ? resolvedSearchParams.to
+        : undefined,
+  };
 
-  const {
-    spendingData,
-    incomeData,
-    balanceData,
-    pivot,
-    totalIncome,
-    totalExpense,
-    netSavings,
-    periodLabel,
-  } = await getAnalyticsData(period);
+  const [
+    {
+      spendingData,
+      incomeData,
+      balanceData,
+      pivot,
+      totalIncome,
+      totalExpense,
+      netSavings,
+      periodLabel,
+    },
+    availableYears,
+  ] = await Promise.all([getAnalyticsData(filter), getTransactionYears()]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-PY", {
@@ -227,9 +230,15 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-semibold">Analytics</h2>
-        <PeriodSwitcher value={period} />
+        <PeriodSwitcher
+          value={filter.period}
+          year={filter.year}
+          from={filter.from}
+          to={filter.to}
+          availableYears={availableYears}
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-2">
