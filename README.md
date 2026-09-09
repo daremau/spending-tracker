@@ -161,15 +161,22 @@ accounts.
 
 ## Production (Docker)
 
-The full stack (app + PgBouncer + Postgres + migrations) runs via Docker, fronted by Traefik:
+The full stack (app + PgBouncer + Postgres + migrations) runs via Docker, exposed
+privately over your Tailscale network (no Traefik, no open ports):
 
 ```bash
-# Build and run everything
+# Build and run everything (app on 127.0.0.1:3000)
 docker compose up --build
 
 # Or run in background
 docker compose up -d --build
+
+# Expose privately via Tailscale Serve with MagicDNS HTTPS
+tailscale funnel off
+tailscale serve --bg http://127.0.0.1:3000
 ```
+
+Then open `https://<machine>.<tailnet>.ts.net` from any device on your Tailnet.
 
 ## Useful Commands
 

@@ -6,7 +6,7 @@ services:
     expose:
       - "3000"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     env_file:
       - .env
     environment:
@@ -16,19 +16,12 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - traefik-net
       - internal
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik-net"
-      - "traefik.http.routers.spending-tracker.rule=PathPrefix(`/`)"
-      - "traefik.http.routers.spending-tracker.entrypoints=web"
-      - "traefik.http.services.spending-tracker.loadbalancer.server.port=3000"
 
   db:
     image: postgres:16-alpine
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -49,7 +42,7 @@ services:
   pgbouncer:
     image: edoburu/pgbouncer:latest
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/spending_tracker
       - POOL_MODE=transaction
@@ -83,6 +76,4 @@ volumes:
   postgres_data:
 
 networks:
-  traefik-net:
-    external: true
   internal:
