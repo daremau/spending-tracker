@@ -1,8 +1,12 @@
 export const dynamic = 'force-dynamic';
 
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 import { getTransactionYears } from "@/actions/transactions";
+import { getNetWorthSummary } from "@/actions/portfolio";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
 import { BalanceChart } from "@/components/charts/balance-chart";
 import { addMonths, format, startOfMonth } from "date-fns";
 import {
@@ -217,7 +221,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       periodLabel,
     },
     availableYears,
-  ] = await Promise.all([getAnalyticsData(filter), getTransactionYears()]);
+    netWorth,
+  ] = await Promise.all([getAnalyticsData(filter), getTransactionYears(), getNetWorthSummary()]);
+  const showInvestments =
+    process.env.PORTFOLIO_ENABLED === "true" && netWorth.hasInvestments;
+  const portfolioPlusNet =
+    netWorth.investmentValueReporting !== null
+      ? Number(netWorth.investmentValueReporting) + netSavings
+      : null;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-PY", {
@@ -225,6 +236,15 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       currency: "PYG",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatReportingCurrency = (amount: number) => {
+    return new Intl.NumberFormat("es-PY", {
+      style: "currency",
+      currency: netWorth.reportingCurrency,
+      minimumFractionDigits: netWorth.reportingCurrency === "PYG" ? 0 : 2,
+      maximumFractionDigits: netWorth.reportingCurrency === "PYG" ? 0 : 2,
     }).format(amount);
   };
 
@@ -271,6 +291,66 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           </CardContent>
         </Card>
       </div>
+
+      {showInvestments && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Portfolio + Net</CardTitle>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/portfolio" className="text-primary">
+                  View Portfolio
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Net follows the selected period; portfolio is a point-in-time
+              snapshot
+            </p>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Portfolio</dt>
+                <dd className="font-semibold tabular-nums">
+                  {netWorth.investmentValueReporting !== null
+                    ? formatReportingCurrency(
+                        Number(netWorth.investmentValueReporting)
+                      )
+                    : "Unavailable"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Net</dt>
+                <dd
+                  className={`font-semibold tabular-nums ${
+                    netSavings >= 0 ? "text-green-600" : "text-red-500"
+                  }`}
+                >
+                  {formatCurrency(netSavings)}
+                </dd>
+              </div>
+              <div className="col-span-2 border-t pt-2">
+                <dt className="text-muted-foreground">Total</dt>
+                <dd className="text-base font-bold tabular-nums">
+                  {portfolioPlusNet !== null
+                    ? formatCurrency(portfolioPlusNet)
+                    : "Unavailable"}
+                </dd>
+              </div>
+            </dl>
+            {netWorth.investmentValueReporting === null && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {netWorth.missingQuotes.length > 0 &&
+                  `Missing prices: ${netWorth.missingQuotes.join(", ")}. `}
+                {netWorth.missingRates.length > 0 &&
+                  `Missing ${netWorth.missingRates.join(", ")} conversion in Currency settings.`}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-2">
