@@ -104,8 +104,21 @@ export async function getTransactions(options?: {
   accountId?: string;
   month?: string;
   source?: "MANUAL" | "CHATBOT" | "IMPORT" | "ALL";
+  categoryId?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  exactAmounts?: number[];
 }) {
-  const { limit, accountId, month, source } = options || {};
+  const {
+    limit,
+    accountId,
+    month,
+    source,
+    categoryId,
+    minAmount,
+    maxAmount,
+    exactAmounts,
+  } = options || {};
   const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month ?? "");
   const monthStart = monthMatch
     ? new Date(`${monthMatch[1]}-${monthMatch[2]}-01T00:00:00.000Z`)
@@ -119,6 +132,27 @@ export async function getTransactions(options?: {
         )
       )
     : null;
+  const validMin =
+    typeof minAmount === "number" &&
+    Number.isFinite(minAmount) &&
+    minAmount >= 0;
+  const validMax =
+    typeof maxAmount === "number" &&
+    Number.isFinite(maxAmount) &&
+    maxAmount >= 0;
+  const validExact =
+    Array.isArray(exactAmounts)
+      ? Array.from(
+          new Set(
+            exactAmounts.filter(
+              (value) =>
+                typeof value === "number" &&
+                Number.isFinite(value) &&
+                value >= 0
+            )
+          )
+        ).slice(0, 50)
+      : [];
 
   const transactions = await prisma.transaction.findMany({
     where: {
@@ -128,6 +162,19 @@ export async function getTransactions(options?: {
             OR: [{ accountId }, { toAccountId: accountId }],
           }
         : {}),
+      ...(categoryId ? { categoryId } : {}),
+      ...(validExact.length > 0
+        ? { amount: { in: validExact } }
+        : validMin
+          ? {
+              amount: {
+                ...(validMax ? { lte: maxAmount } : {}),
+                gte: minAmount,
+              },
+            }
+          : validMax
+            ? { amount: { lte: maxAmount } }
+            : {}),
       ...(monthStart && monthEnd
         ? {
             date: {
