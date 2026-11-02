@@ -22,6 +22,7 @@ interface ImportResult {
   assetsCreated: number;
   investmentAccountsCreated: number;
   investmentTransactionsCreated: number;
+  investmentFundingsCreated?: number;
   sourceVersion: 1 | 2;
   errors: string[];
 }
@@ -205,6 +206,7 @@ export function ImportPanel({ onClose }: { onClose: () => void }) {
                 ["Assets", result.assetsCreated],
                 ["Investment accounts", result.investmentAccountsCreated],
                 ["Investment activity", result.investmentTransactionsCreated],
+                ["Investment funding", result.investmentFundingsCreated ?? 0],
               ] as const
             )
               .filter(([, count]) => count > 0)

@@ -270,7 +270,7 @@ export default async function InvestmentAccountPage({
                             ? "Cash funding"
                             : "Cash withdrawal"}
                           {" · "}
-                          {entry.activity.bankAccountName}
+                          {entry.activity.bankAccountName ?? "External funds"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {new Intl.DateTimeFormat("es-PY").format(

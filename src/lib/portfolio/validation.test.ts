@@ -130,4 +130,17 @@ describe("Sprint 3 portfolio validation", () => {
         .success
     ).toBe(false);
   });
+
+  it("allows funding without a bank account", () => {
+    expect(
+      portfolioTransferSchema.safeParse({
+        clientRequestId: "31423b38-140e-4b3f-bd6d-c57ef85eab2d",
+        accountId: "investment",
+        direction: "WITHDRAW",
+        amount: "50",
+        date: "2026-07-29",
+        notes: "",
+      }).success
+    ).toBe(true);
+  });
 });

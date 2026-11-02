@@ -48,6 +48,7 @@ export function PortfolioTransferForm({
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState("");
   const [direction, setDirection] = useState<"FUND" | "WITHDRAW">("FUND");
+  const [source, setSource] = useState("external");
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) setRequestId(crypto.randomUUID());
@@ -80,8 +81,8 @@ export function PortfolioTransferForm({
         <DialogHeader>
           <DialogTitle>Move investment cash</DialogTitle>
           <DialogDescription>
-            Funding and withdrawals are transfers. They do not count as income
-            or spending.
+            Fund with outside money or move cash to a bank account. Direct
+            funding does not count as income or spending.
           </DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
@@ -110,20 +111,27 @@ export function PortfolioTransferForm({
                   Fund investment cash
                 </SelectItem>
                 <SelectItem value="WITHDRAW">
-                  Withdraw to bank
+                  Withdraw cash
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor={`transfer-bank-${account.id}`}>
-              {direction === "FUND" ? "From bank account" : "To bank account"}
+              {direction === "FUND" ? "From" : "To"}
             </Label>
-            <Select name="bankAccountId" required>
+            <Select
+              name="bankAccountId"
+              value={source}
+              onValueChange={setSource}
+            >
               <SelectTrigger id={`transfer-bank-${account.id}`}>
-                <SelectValue placeholder="Choose account" />
+                <SelectValue placeholder="Choose source" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="external">
+                  External funds (no bank account)
+                </SelectItem>
                 {bankAccounts.map((bankAccount) => (
                   <SelectItem key={bankAccount.id} value={bankAccount.id}>
                     {bankAccount.name} ·{" "}
@@ -132,7 +140,7 @@ export function PortfolioTransferForm({
                 ))}
               </SelectContent>
             </Select>
-            {bankAccounts.length === 0 && (
+            {source !== "external" && bankAccounts.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 Create a standard {account.cashCurrency} account before moving
                 cash.
@@ -172,10 +180,7 @@ export function PortfolioTransferForm({
               placeholder="Optional"
             />
           </div>
-          <Button
-            className="w-full"
-            disabled={pending || bankAccounts.length === 0}
-          >
+          <Button className="w-full" disabled={pending}>
             {direction === "FUND" ? <ArrowDownToLine /> : <ArrowUpFromLine />}
             {pending
               ? "Saving..."

@@ -19,6 +19,7 @@ export async function collectBackup(): Promise<BackupDataV2> {
     assets,
     investmentAccounts,
     investmentTransactions,
+    investmentFundings,
     manualQuotes,
   ] = await Promise.all([
     prisma.appSettings.findUnique({ where: { id: "singleton" } }),
@@ -39,6 +40,10 @@ export async function collectBackup(): Promise<BackupDataV2> {
     }),
     prisma.investmentTransaction.findMany({
       include: { account: true, asset: true },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.investmentCashFunding.findMany({
+      include: { account: true },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     }),
     prisma.marketQuote.findMany({
@@ -117,6 +122,14 @@ export async function collectBackup(): Promise<BackupDataV2> {
       fxRateToReporting: transaction.fxRateToReporting.toString(),
       date: transaction.date.toISOString(),
       notes: transaction.notes,
+    })),
+    investmentFundings: investmentFundings.map((funding) => ({
+      clientRequestId: funding.clientRequestId,
+      accountName: funding.account.name,
+      direction: funding.direction,
+      amount: funding.amount.toString(),
+      date: funding.date.toISOString(),
+      notes: funding.notes,
     })),
     manualQuotes: manualQuotes.map((quote) => ({
       assetType: quote.asset.type,

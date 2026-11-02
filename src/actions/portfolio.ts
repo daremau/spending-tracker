@@ -182,6 +182,27 @@ function serializeFundingActivity(
   };
 }
 
+function serializeDirectFundingActivity(
+  funding: {
+    id: string;
+    direction: "FUND" | "WITHDRAW";
+    amount: Prisma.Decimal;
+    date: Date;
+    notes: string | null;
+  },
+  currency: string
+): PortfolioTransferActivityDto {
+  return {
+    id: funding.id,
+    type: funding.direction === "FUND" ? "FUNDING" : "WITHDRAWAL",
+    amount: funding.amount.toString(),
+    currency,
+    bankAccountName: null,
+    date: funding.date.toISOString(),
+    notes: funding.notes,
+  };
+}
+
 type LoadedInvestmentAccount = Prisma.InvestmentAccountGetPayload<{
   include: {
     cashAccount: true;
@@ -615,40 +636,52 @@ export async function getInvestmentAccountDetail(
   const loadedAccount = state.accounts.find((candidate) => candidate.id === id);
   if (!account || !loadedAccount) return null;
 
-  const [standardAccounts, fundingTransactions] = await Promise.all([
-    prisma.bankAccount.findMany({
-      where: {
-        kind: "STANDARD",
-        currency: account.cashCurrency,
-      },
-      select: { id: true, name: true, currency: true, balance: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.transaction.findMany({
-      where: {
-        type: "TRANSFER",
-        clientRequestId: { not: null },
-        OR: [
-          { accountId: loadedAccount.cashAccountId },
-          { toAccountId: loadedAccount.cashAccountId },
-        ],
-      },
-      include: {
-        account: { select: { name: true, currency: true } },
-        toAccount: { select: { name: true, currency: true } },
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    }),
-  ]);
+  const [standardAccounts, fundingTransactions, directFundings] =
+    await Promise.all([
+      prisma.bankAccount.findMany({
+        where: {
+          kind: "STANDARD",
+          currency: account.cashCurrency,
+        },
+        select: { id: true, name: true, currency: true, balance: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.transaction.findMany({
+        where: {
+          type: "TRANSFER",
+          clientRequestId: { not: null },
+          OR: [
+            { accountId: loadedAccount.cashAccountId },
+            { toAccountId: loadedAccount.cashAccountId },
+          ],
+        },
+        include: {
+          account: { select: { name: true, currency: true } },
+          toAccount: { select: { name: true, currency: true } },
+        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      }),
+      prisma.investmentCashFunding.findMany({
+        where: { accountId: loadedAccount.id },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      }),
+    ]);
+
+  const fundingActivities: PortfolioTransferActivityDto[] = [
+    ...fundingTransactions.map((transaction) =>
+      serializeFundingActivity(transaction, loadedAccount.cashAccountId)
+    ),
+    ...directFundings.map((funding) =>
+      serializeDirectFundingActivity(funding, account.cashCurrency)
+    ),
+  ].sort((left, right) => Date.parse(right.date) - Date.parse(left.date));
 
   return {
     account,
     activities: [...loadedAccount.transactions]
       .sort((left, right) => right.date.getTime() - left.date.getTime())
       .map(serializeActivity),
-    fundingActivities: fundingTransactions.map((transaction) =>
-      serializeFundingActivity(transaction, loadedAccount.cashAccountId)
-    ),
+    fundingActivities,
     assets: state.assets.map(serializeAsset),
     standardAccounts: standardAccounts.map((standardAccount) => ({
       ...standardAccount,
@@ -1167,11 +1200,92 @@ export async function deleteInvestmentActivity(id: string) {
   }
 }
 
+type DirectFundingInput = {
+  clientRequestId: string;
+  accountId: string;
+  direction: "FUND" | "WITHDRAW";
+  amount: string;
+  date: Date;
+  notes: string;
+};
+
+type DirectFundingAccount = {
+  id: string;
+  name: string;
+  cashAccountId: string;
+};
+
+/**
+ * Moves cash directly in or out of an investment cash account without
+ * touching a bank account. The funding row is the audit record, so the
+ * portfolio stays independent of the bank ledger.
+ */
+async function createDirectFunding(
+  tx: Prisma.TransactionClient,
+  investmentAccount: DirectFundingAccount,
+  input: DirectFundingInput
+) {
+  const existing = await tx.investmentCashFunding.findUnique({
+    where: { clientRequestId: input.clientRequestId },
+  });
+  if (existing) {
+    if (
+      existing.accountId !== investmentAccount.id ||
+      existing.direction !== input.direction ||
+      !existing.amount.equals(input.amount) ||
+      existing.date.getTime() !== input.date.getTime() ||
+      (existing.notes ?? "") !== input.notes
+    ) {
+      throw new Error(
+        "This request identifier was already used for different data"
+      );
+    }
+    return existing;
+  }
+
+  const funding = input.direction === "FUND";
+  if (funding) {
+    await tx.bankAccount.update({
+      where: { id: investmentAccount.cashAccountId },
+      data: { balance: { increment: input.amount } },
+    });
+  } else {
+    const debit = await tx.bankAccount.updateMany({
+      where: {
+        id: investmentAccount.cashAccountId,
+        kind: "INVESTMENT_CASH",
+        balance: { gte: input.amount },
+      },
+      data: { balance: { decrement: input.amount } },
+    });
+    if (debit.count !== 1) {
+      throw new Error("Insufficient investment cash for this withdrawal");
+    }
+  }
+
+  return tx.investmentCashFunding.create({
+    data: {
+      clientRequestId: input.clientRequestId,
+      accountId: investmentAccount.id,
+      direction: input.direction,
+      amount: input.amount,
+      date: input.date,
+      notes: input.notes || null,
+    },
+  });
+}
+
 export async function createPortfolioTransfer(formData: FormData) {
+  const rawBankAccountId = formData.get("bankAccountId");
   const parsed = portfolioTransferSchema.safeParse({
     clientRequestId: formData.get("clientRequestId"),
     accountId: formData.get("accountId"),
-    bankAccountId: formData.get("bankAccountId"),
+    bankAccountId:
+      typeof rawBankAccountId === "string" &&
+      rawBankAccountId.trim() !== "" &&
+      rawBankAccountId !== "external"
+        ? rawBankAccountId
+        : undefined,
     direction: formData.get("direction"),
     amount: formData.get("amount"),
     date: formData.get("date"),
@@ -1182,37 +1296,41 @@ export async function createPortfolioTransfer(formData: FormData) {
   }
 
   try {
-    const result = await withSerializableRetry(
-      async (tx) => {
-        const [investmentAccount, bankAccount] = await Promise.all([
-          tx.investmentAccount.findUnique({
-            where: { id: parsed.data.accountId },
-            include: { cashAccount: true },
-          }),
-          tx.bankAccount.findFirst({
-            where: { id: parsed.data.bankAccountId, kind: "STANDARD" },
-          }),
-        ]);
-        if (!investmentAccount || investmentAccount.archivedAt) {
-          throw new Error("Active investment account not found");
-        }
-        if (!bankAccount) throw new Error("Standard bank account not found");
-        if (
-          investmentAccount.cashAccount.kind !== "INVESTMENT_CASH" ||
-          investmentAccount.cashAccount.currency !== bankAccount.currency
-        ) {
-          throw new Error(
-            `Choose a standard ${investmentAccount.cashCurrency} account`
-          );
-        }
+    const result = await withSerializableRetry(async (tx) => {
+      const investmentAccount = await tx.investmentAccount.findUnique({
+        where: { id: parsed.data.accountId },
+        include: { cashAccount: true },
+      });
+      if (!investmentAccount || investmentAccount.archivedAt) {
+        throw new Error("Active investment account not found");
+      }
+      if (investmentAccount.cashAccount.kind !== "INVESTMENT_CASH") {
+        throw new Error("Linked investment cash account is invalid");
+      }
 
-        const funding = parsed.data.direction === "FUND";
-        const sourceId = funding
-          ? bankAccount.id
-          : investmentAccount.cashAccountId;
-        const destinationId = funding
-          ? investmentAccount.cashAccountId
-          : bankAccount.id;
+      // No bank account: move cash directly in or out of the investment cash
+      // account without touching the bank ledger.
+      if (!parsed.data.bankAccountId) {
+        return createDirectFunding(tx, investmentAccount, parsed.data);
+      }
+
+      const bankAccount = await tx.bankAccount.findFirst({
+        where: { id: parsed.data.bankAccountId, kind: "STANDARD" },
+      });
+      if (!bankAccount) throw new Error("Standard bank account not found");
+      if (investmentAccount.cashAccount.currency !== bankAccount.currency) {
+        throw new Error(
+          `Choose a standard ${investmentAccount.cashCurrency} account`
+        );
+      }
+
+      const funding = parsed.data.direction === "FUND";
+      const sourceId = funding
+        ? bankAccount.id
+        : investmentAccount.cashAccountId;
+      const destinationId = funding
+        ? investmentAccount.cashAccountId
+        : bankAccount.id;
         const description =
           parsed.data.notes ||
           (funding

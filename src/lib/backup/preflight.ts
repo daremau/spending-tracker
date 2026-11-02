@@ -225,6 +225,34 @@ export function preflightBackup(backup: BackupDataV2): PreflightResult {
     }
   }
 
+  const fundingIds = new Set<string>();
+  for (const funding of backup.investmentFundings) {
+    if (fundingIds.has(funding.clientRequestId)) {
+      errors.push(
+        `Duplicate investment funding id "${funding.clientRequestId}"`
+      );
+    }
+    fundingIds.add(funding.clientRequestId);
+
+    if (
+      !investmentAccountNames.has(funding.accountName.trim().toLowerCase())
+    ) {
+      errors.push(
+        `Investment funding "${funding.clientRequestId}" references missing account "${funding.accountName}"`
+      );
+    }
+    if (!isValidDate(funding.date)) {
+      errors.push(
+        `Investment funding "${funding.clientRequestId}" has an invalid date`
+      );
+    }
+    if (!isFiniteDecimal(funding.amount)) {
+      errors.push(
+        `Investment funding "${funding.clientRequestId}" has an invalid amount`
+      );
+    }
+  }
+
   for (const quote of backup.manualQuotes) {
     const key = assetKey(quote.assetType, quote.assetSymbol, quote.assetMarket);
     if (!assetKeys.has(key)) {
@@ -306,9 +334,9 @@ function replayInvestmentLedgers(backup: BackupDataV2): string[] {
 }
 
 /**
- * Confirms each investment cash balance equals its funding transfers plus the
- * cash effect of its investment transactions, so a restore cannot commit a
- * ledger that disagrees with the balance it claims.
+ * Confirms each investment cash balance equals its funding transfers, its
+ * direct fundings, plus the cash effect of its investment transactions, so a
+ * restore cannot commit a ledger that disagrees with the balance it claims.
  */
 function checkLinkedCashConsistency(backup: BackupDataV2): string[] {
   const errors: string[] = [];
@@ -332,6 +360,14 @@ function checkLinkedCashConsistency(backup: BackupDataV2): string[] {
     }
 
     const accountName = investmentAccount.name.trim().toLowerCase();
+    for (const funding of backup.investmentFundings) {
+      if (funding.accountName.trim().toLowerCase() !== accountName) continue;
+      expected = expected.plus(
+        funding.direction === "FUND"
+          ? funding.amount
+          : new BackupDecimal(funding.amount).negated().toString()
+      );
+    }
     for (const transaction of backup.investmentTransactions) {
       if (transaction.accountName.trim().toLowerCase() !== accountName) continue;
       expected = expected.plus(

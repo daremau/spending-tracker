@@ -42,7 +42,8 @@ export type PortfolioTransferActivityDto = {
   type: "FUNDING" | "WITHDRAWAL";
   amount: string;
   currency: string;
-  bankAccountName: string;
+  /** Null for direct funding that involves no bank account. */
+  bankAccountName: string | null;
   date: string;
   notes: string | null;
 };

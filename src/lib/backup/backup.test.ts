@@ -115,6 +115,25 @@ function fixture(): BackupDataV2 {
     },
   ];
 
+  backup.investmentFundings = [
+    {
+      clientRequestId: "if-1",
+      accountName: "IBKR",
+      direction: "FUND",
+      amount: "500",
+      date: "2026-02-15T00:00:00.000Z",
+      notes: null,
+    },
+    {
+      clientRequestId: "if-2",
+      accountName: "IBKR",
+      direction: "WITHDRAW",
+      amount: "500",
+      date: "2026-02-16T00:00:00.000Z",
+      notes: "Round trip",
+    },
+  ];
+
   backup.investmentTransactions = [
     {
       clientRequestId: "iv-1",
@@ -237,6 +256,7 @@ describe("version 2 CSV round trip", () => {
     expect(backup.investmentTransactions).toEqual(
       original.investmentTransactions
     );
+    expect(backup.investmentFundings).toEqual(original.investmentFundings);
     expect(backup.manualQuotes).toEqual(original.manualQuotes);
   });
 
@@ -283,6 +303,7 @@ describe("version 2 Excel round trip", () => {
     expect(backup.investmentTransactions).toEqual(
       original.investmentTransactions
     );
+    expect(backup.investmentFundings).toEqual(original.investmentFundings);
     expect(backup.manualQuotes).toEqual(original.manualQuotes);
   });
 
@@ -393,6 +414,46 @@ describe("preflightBackup", () => {
     expect(result.ok).toBe(false);
     expect(
       result.errors.some((error) => error.includes("its ledger implies"))
+    ).toBe(true);
+  });
+
+  it("counts direct fundings in the investment cash check", () => {
+    const backup = fixture();
+    backup.investmentFundings.push({
+      clientRequestId: "if-3",
+      accountName: "IBKR",
+      direction: "FUND",
+      amount: "100",
+      date: "2026-05-01T00:00:00.000Z",
+      notes: null,
+    });
+
+    const result = preflightBackup(backup);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some((error) => error.includes("its ledger implies"))
+    ).toBe(true);
+  });
+
+  it("rejects a direct funding that references a missing account", () => {
+    const backup = fixture();
+    backup.investmentFundings[0].accountName = "Ghost";
+
+    const result = preflightBackup(backup);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some((error) => error.includes('references missing account "Ghost"'))
+    ).toBe(true);
+  });
+
+  it("rejects a duplicate direct funding id", () => {
+    const backup = fixture();
+    backup.investmentFundings.push({ ...backup.investmentFundings[0] });
+
+    const result = preflightBackup(backup);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some((error) => error.includes("Duplicate investment funding id"))
     ).toBe(true);
   });
 

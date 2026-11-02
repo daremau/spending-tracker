@@ -88,7 +88,9 @@ export const manualQuoteSchema = z.object({
 export const portfolioTransferSchema = z.object({
   clientRequestId: requestId,
   accountId: requiredId,
-  bankAccountId: requiredId,
+  // Absent when money moves directly in or out of the investment cash
+  // account without touching a bank account.
+  bankAccountId: z.string().trim().optional(),
   direction: z.enum(["FUND", "WITHDRAW"]),
   amount: positiveDecimal(10, 2),
   date: z.coerce.date(),

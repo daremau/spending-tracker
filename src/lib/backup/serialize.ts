@@ -196,6 +196,27 @@ export const BACKUP_SHEETS: SheetSpec[] = [
       ]),
   },
   {
+    name: "InvestmentFundings",
+    section: "INVESTMENT_FUNDINGS",
+    columns: [
+      { header: "ClientRequestId", width: 30 },
+      { header: "Account", width: 25 },
+      { header: "Direction", width: 12 },
+      { header: "Amount", width: 18 },
+      { header: "Date", width: 26 },
+      { header: "Notes", width: 30 },
+    ],
+    rows: (backup) =>
+      backup.investmentFundings.map((funding) => [
+        funding.clientRequestId,
+        funding.accountName,
+        funding.direction,
+        funding.amount,
+        funding.date,
+        funding.notes,
+      ]),
+  },
+  {
     name: "ManualQuotes",
     section: "MANUAL_QUOTES",
     columns: [

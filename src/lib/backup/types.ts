@@ -101,6 +101,16 @@ export type BackupInvestmentTransaction = {
   notes: string | null;
 };
 
+/** Direct investment-cash funding that involves no bank account. */
+export type BackupInvestmentFunding = {
+  clientRequestId: string;
+  accountName: string;
+  direction: "FUND" | "WITHDRAW";
+  amount: string;
+  date: string;
+  notes: string | null;
+};
+
 export type BackupManualQuote = {
   assetType: string;
   assetSymbol: string;
@@ -122,6 +132,7 @@ export type BackupDataV2 = {
   assets: BackupAsset[];
   investmentAccounts: BackupInvestmentAccount[];
   investmentTransactions: BackupInvestmentTransaction[];
+  investmentFundings: BackupInvestmentFunding[];
   manualQuotes: BackupManualQuote[];
 };
 
@@ -145,6 +156,7 @@ export function emptyBackup(): BackupDataV2 {
     assets: [],
     investmentAccounts: [],
     investmentTransactions: [],
+    investmentFundings: [],
     manualQuotes: [],
   };
 }

@@ -142,8 +142,12 @@ Export and import live behind the header's backup button, in CSV and Excel.
 Exports use **schema version 2**, which covers reporting-currency settings,
 bank accounts, categories, transactions (including IVA Digital parent/child
 links), manual exchange rates, the asset catalog, investment accounts,
-investment transactions, and manual quotes. Numbers are written as text so
-8-decimal balances and 12-decimal quantities survive a spreadsheet round trip.
+investment transactions, direct cash fundings, and manual quotes. Numbers are
+written as text so 8-decimal balances and 12-decimal quantities survive a
+spreadsheet round trip. Portfolio funding no longer requires a bank account:
+money can move directly in or out of an investment account as external funds,
+and bank-linked transfers remain supported for moving cash between your own
+accounts.
 
 Provider-fetched quotes and rates are deliberately excluded: they are a
 refetchable cache, and restoring them would present old prices as current. No

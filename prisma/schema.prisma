@@ -65,6 +65,7 @@ model InvestmentAccount {
   updatedAt     DateTime                @updatedAt
   cashAccount   BankAccount             @relation("InvestmentCashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
   transactions  InvestmentTransaction[]
+  fundings      InvestmentCashFunding[]
 
   @@index([archivedAt])
 }
@@ -123,6 +124,31 @@ model InvestmentTransaction {
   @@index([accountId, date, createdAt])
   @@index([assetId, date, createdAt])
   @@index([accountId, assetId])
+}
+
+enum FundingDirection {
+  FUND
+  WITHDRAW
+}
+
+// Direct investment-cash funding that involves no bank account. A FUND adds
+// outside money to the linked investment cash account; a WITHDRAW removes it.
+// Unlike bank-linked funding (a TRANSFER between a STANDARD account and the
+// investment cash account), these rows keep the portfolio independent of the
+// bank ledger.
+model InvestmentCashFunding {
+  id              String           @id @default(cuid())
+  clientRequestId String           @unique
+  accountId       String
+  direction       FundingDirection
+  amount          Decimal          @db.Decimal(12, 2)
+  date            DateTime
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  account         InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, date])
 }
 
 enum InvestmentTransactionType {

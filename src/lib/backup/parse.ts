@@ -27,6 +27,7 @@ const INVESTMENT_TRANSACTION_TYPES = new Set([
   "DIVIDEND",
   "FEE",
 ]);
+const FUNDING_DIRECTIONS = new Set(["FUND", "WITHDRAW"]);
 
 function toIsoDate(value: string): string {
   const parsed = Date.parse(value);
@@ -172,8 +173,23 @@ function buildFromSections(sections: CsvSections): ParsedBackup {
     });
   }
 
-  for (const row of sections.get("MANUAL_QUOTES") ?? []) {
-    const symbol = cell(row, 1);
+  for (const row of sections.get("INVESTMENT_FUNDINGS") ?? []) {
+    const clientRequestId = cell(row, 0);
+    const accountName = cell(row, 1);
+    const direction = cell(row, 2).toUpperCase();
+    if (!clientRequestId || !accountName || !FUNDING_DIRECTIONS.has(direction))
+      continue;
+    backup.investmentFundings.push({
+      clientRequestId,
+      accountName,
+      direction: direction as "FUND" | "WITHDRAW",
+      amount: cell(row, 3) || "0",
+      date: toIsoDate(cell(row, 4)),
+      notes: optionalCell(row, 5),
+    });
+  }
+
+  for (const row of sections.get("MANUAL_QUOTES") ?? []) {    const symbol = cell(row, 1);
     if (!symbol) continue;
     backup.manualQuotes.push({
       assetType: cell(row, 0).toUpperCase(),

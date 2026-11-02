@@ -10,6 +10,7 @@ export type RestoreResult = {
   assetsCreated: number;
   investmentAccountsCreated: number;
   investmentTransactionsCreated: number;
+  investmentFundingsCreated: number;
   errors: string[];
 };
 
@@ -22,6 +23,7 @@ function emptyResult(): RestoreResult {
     assetsCreated: 0,
     investmentAccountsCreated: 0,
     investmentTransactionsCreated: 0,
+    investmentFundingsCreated: 0,
     errors: [],
   };
 }
@@ -55,6 +57,7 @@ export async function restoreBackup(
         // Delete children before parents; investment transactions and quotes
         // cascade from their owners but are removed explicitly for clarity.
         await tx.investmentTransaction.deleteMany({});
+        await tx.investmentCashFunding.deleteMany({});
         await tx.marketQuote.deleteMany({});
         await tx.investmentAccount.deleteMany({});
         await tx.asset.deleteMany({});
@@ -195,6 +198,24 @@ export async function restoreBackup(
           });
           investmentAccountIds.set(lower(account.name), created.id);
           result.investmentAccountsCreated += 1;
+        }
+
+        for (const funding of backup.investmentFundings) {
+          const accountId = investmentAccountIds.get(
+            lower(funding.accountName)
+          );
+          if (!accountId) continue;
+          await tx.investmentCashFunding.create({
+            data: {
+              clientRequestId: funding.clientRequestId,
+              accountId,
+              direction: funding.direction,
+              amount: funding.amount,
+              date: new Date(funding.date),
+              notes: funding.notes,
+            },
+          });
+          result.investmentFundingsCreated += 1;
         }
 
         for (const transaction of backup.investmentTransactions) {
