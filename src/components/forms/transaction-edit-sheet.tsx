@@ -20,12 +20,18 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, TrendingUp, TrendingDown, ArrowLeftRight, Repeat } from "lucide-react";
+import { Pencil, TrendingUp, TrendingDown, ArrowLeftRight, Repeat, Scale } from "lucide-react";
 import { updateTransaction } from "@/actions/transactions";
 import { AmountInput } from "@/components/ui/amount-input";
 import type { Category } from "@prisma/client";
 
-type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
+type TransactionType =
+  | "INCOME"
+  | "EXPENSE"
+  | "TRANSFER"
+  | "P2P"
+  | "ADJUSTMENT_IN"
+  | "ADJUSTMENT_OUT";
 
 interface TransactionEditSheetProps {
   transaction: {
@@ -70,6 +76,10 @@ export function TransactionEditSheet({
   const isOpen = typeof open === "boolean" ? open : uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
   const isDigitalTaxTransaction = transaction.isDigitalTax ?? false;
+  const isAdjustment =
+    type === "ADJUSTMENT_IN" || type === "ADJUSTMENT_OUT";
+  const isIncomeLike = type === "INCOME" || type === "ADJUSTMENT_IN";
+  const tabValue = isAdjustment ? "ADJUSTMENT" : type;
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -79,7 +89,7 @@ export function TransactionEditSheet({
     formData.set("type", type);
     formData.set("applyDigitalTax", applyDigitalTax ? "true" : "false");
 
-    if (type === "TRANSFER") {
+    if (type === "TRANSFER" || isAdjustment) {
       formData.set("categoryId", "");
     } else {
       formData.set("toAccountId", "");
@@ -97,9 +107,17 @@ export function TransactionEditSheet({
     setOpen(false);
   }
 
-  const categories = type === "INCOME" ? incomeCategories : expenseCategories;
+  const categories = isIncomeLike ? incomeCategories : expenseCategories;
 
   function handleTypeChange(value: string) {
+    if (value === "ADJUSTMENT") {
+      // Default: resta (usa las categorías de gasto). Si venía de INCOME o
+      // ADJUSTMENT_IN, la categoría seleccionada no aplica.
+      if (isIncomeLike) setCategoryId("");
+      setToAccountId("");
+      setType("ADJUSTMENT_OUT");
+      return;
+    }
     const nextType = value as TransactionType;
     if (nextType === type) return;
     setType(nextType);
@@ -107,11 +125,21 @@ export function TransactionEditSheet({
       setCategoryId("");
     } else {
       setToAccountId("");
-      // INCOME usa otro set de categorías: solo limpiar al cruzar ese límite.
-      if ((nextType === "INCOME") !== (type === "INCOME")) {
+      // INCOME y ADJUSTMENT_IN usan otro set de categorías.
+      const nextIsIncome =
+        nextType === "INCOME" || nextType === "ADJUSTMENT_IN";
+      if (nextIsIncome !== isIncomeLike) {
         setCategoryId("");
       }
     }
+  }
+
+  function handleAdjustmentDirection(direction: "IN" | "OUT") {
+    const nextType =
+      direction === "IN" ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT";
+    if (nextType === type) return;
+    setType(nextType);
+    setCategoryId("");
   }
 
   const formattedDate = new Date(transaction.date).toISOString().split("T")[0];
@@ -137,8 +165,8 @@ export function TransactionEditSheet({
           <SheetDescription>Update the details of this transaction</SheetDescription>
         </SheetHeader>
 
-        <Tabs value={type} onValueChange={handleTypeChange} className="px-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-4">
+        <Tabs value={tabValue} onValueChange={handleTypeChange} className="px-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 mb-4">
             <TabsTrigger value="INCOME" className="gap-1">
               <TrendingUp className="h-4 w-4" />
               Income
@@ -154,6 +182,10 @@ export function TransactionEditSheet({
             <TabsTrigger value="P2P" className="gap-1">
               <Repeat className="h-4 w-4" />
               P2P
+            </TabsTrigger>
+            <TabsTrigger value="ADJUSTMENT" className="gap-1">
+              <Scale className="h-4 w-4" />
+              Ajuste
             </TabsTrigger>
           </TabsList>
 
@@ -180,6 +212,28 @@ export function TransactionEditSheet({
                 required
               />
             </div>
+
+            {isAdjustment && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-adjustment-direction">
+                  Dirección del ajuste
+                </Label>
+                <Select
+                  value={type === "ADJUSTMENT_IN" ? "IN" : "OUT"}
+                  onValueChange={(v) =>
+                    handleAdjustmentDirection(v as "IN" | "OUT")
+                  }
+                >
+                  <SelectTrigger id="edit-adjustment-direction">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IN">Suma (a favor)</SelectItem>
+                    <SelectItem value="OUT">Resta (en contra)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="edit-accountId">
@@ -222,7 +276,7 @@ export function TransactionEditSheet({
               </div>
             )}
 
-            {type !== "TRANSFER" && (
+            {type !== "TRANSFER" && !isAdjustment && (
               <div className="space-y-2">
                 <Label htmlFor="edit-categoryId">Category</Label>
                 <Select

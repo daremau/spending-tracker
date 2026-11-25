@@ -6,7 +6,17 @@ import { Prisma } from "@prisma/client";
 import { amountToNumber } from "@/lib/format";
 import { getOrCreateDigitalTaxCategory } from "./categories";
 
-type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
+type TransactionType =
+  | "INCOME"
+  | "EXPENSE"
+  | "TRANSFER"
+  | "P2P"
+  | "ADJUSTMENT_IN"
+  | "ADJUSTMENT_OUT";
+
+function isAdjustmentType(type: TransactionType) {
+  return type === "ADJUSTMENT_IN" || type === "ADJUSTMENT_OUT";
+}
 
 const DIGITAL_TAX_RATE = 0.10; // 10%
 type TransactionBalanceData = {
@@ -51,12 +61,16 @@ async function applyTransactionBalance(
   tx: Prisma.TransactionClient,
   data: TransactionBalanceData
 ) {
-  if (data.type === "INCOME") {
+  if (data.type === "INCOME" || data.type === "ADJUSTMENT_IN") {
     await tx.bankAccount.update({
       where: { id: data.accountId },
       data: { balance: { increment: data.amount } },
     });
-  } else if (data.type === "EXPENSE" || data.type === "P2P") {
+  } else if (
+    data.type === "EXPENSE" ||
+    data.type === "P2P" ||
+    data.type === "ADJUSTMENT_OUT"
+  ) {
     await tx.bankAccount.update({
       where: { id: data.accountId },
       data: { balance: { decrement: data.amount } },
@@ -77,12 +91,16 @@ async function revertTransactionBalance(
   tx: Prisma.TransactionClient,
   data: TransactionBalanceData
 ) {
-  if (data.type === "INCOME") {
+  if (data.type === "INCOME" || data.type === "ADJUSTMENT_IN") {
     await tx.bankAccount.update({
       where: { id: data.accountId },
       data: { balance: { decrement: data.amount } },
     });
-  } else if (data.type === "EXPENSE" || data.type === "P2P") {
+  } else if (
+    data.type === "EXPENSE" ||
+    data.type === "P2P" ||
+    data.type === "ADJUSTMENT_OUT"
+  ) {
     await tx.bankAccount.update({
       where: { id: data.accountId },
       data: { balance: { increment: data.amount } },
@@ -286,6 +304,10 @@ export async function createTransaction(formData: FormData) {
   }
 
   const date = dateStr ? new Date(dateStr) : new Date();
+  const normalizedCategoryId =
+    type === "TRANSFER" || isAdjustmentType(type)
+      ? null
+      : categoryId || null;
 
   // Get digital tax category if needed
   let digitalTaxCategoryId: string | null = null;
@@ -302,7 +324,7 @@ export async function createTransaction(formData: FormData) {
         description: description || null,
         date,
         accountId,
-        categoryId: categoryId || null,
+        categoryId: normalizedCategoryId,
         toAccountId: type === "TRANSFER" ? toAccountId : null,
         isDigitalTax: false,
       },
@@ -417,7 +439,10 @@ export async function updateTransaction(formData: FormData) {
   }
 
   const date = dateStr ? new Date(dateStr) : new Date();
-  const normalizedCategoryId = type === "TRANSFER" ? null : categoryId || null;
+  const normalizedCategoryId =
+    type === "TRANSFER" || isAdjustmentType(type)
+      ? null
+      : categoryId || null;
   const normalizedToAccountId =
     type === "TRANSFER" ? (toAccountId as string) : null;
 

@@ -19,6 +19,7 @@ import {
   TrendingDown,
   ArrowLeftRight,
   Repeat,
+  Scale,
 } from "lucide-react";
 import { deleteTransaction } from "@/actions/transactions";
 import { TransactionEditSheet } from "@/components/forms/transaction-edit-sheet";
@@ -34,7 +35,13 @@ interface Account {
 interface TransactionCardProps {
   transaction: {
     id: string;
-    type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
+    type:
+      | "INCOME"
+      | "EXPENSE"
+      | "TRANSFER"
+      | "P2P"
+      | "ADJUSTMENT_IN"
+      | "ADJUSTMENT_OUT";
     amount: number;
     description: string | null;
     date: Date;
@@ -67,6 +74,9 @@ export function TransactionCard({
   const [editOpen, setEditOpen] = useState(false);
 
   const isDigitalTaxTransaction = transaction.isDigitalTax ?? false;
+  const isAdjustment =
+    transaction.type === "ADJUSTMENT_IN" ||
+    transaction.type === "ADJUSTMENT_OUT";
 
   async function handleDelete() {
     if (isDigitalTaxTransaction) {
@@ -102,6 +112,9 @@ export function TransactionCard({
         return <ArrowLeftRight className="h-4 w-4 text-blue-500" />;
       case "P2P":
         return <Repeat className="h-4 w-4 text-indigo-500" />;
+      case "ADJUSTMENT_IN":
+      case "ADJUSTMENT_OUT":
+        return <Scale className="h-4 w-4 text-amber-600" />;
     }
   };
 
@@ -115,6 +128,9 @@ export function TransactionCard({
         return "text-blue-500";
       case "P2P":
         return "text-indigo-500";
+      case "ADJUSTMENT_IN":
+      case "ADJUSTMENT_OUT":
+        return "text-amber-600";
     }
   };
 
@@ -127,6 +143,10 @@ export function TransactionCard({
       case "TRANSFER":
         return "";
       case "P2P":
+        return "-";
+      case "ADJUSTMENT_IN":
+        return "+";
+      case "ADJUSTMENT_OUT":
         return "-";
     }
   };
@@ -142,7 +162,8 @@ export function TransactionCard({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="font-medium text-sm truncate">
-                  {transaction.description || transaction.type}
+                  {transaction.description ||
+                    (isAdjustment ? "Ajuste" : transaction.type)}
                 </p>
                 {transaction.category && (
                   <Badge
@@ -162,6 +183,14 @@ export function TransactionCard({
                     className="text-xs shrink-0 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
                   >
                     P2P
+                  </Badge>
+                )}
+                {isAdjustment && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs shrink-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                  >
+                    Ajuste
                   </Badge>
                 )}
                 {isDigitalTaxTransaction && (

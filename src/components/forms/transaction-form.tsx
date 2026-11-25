@@ -28,7 +28,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, TrendingDown, ArrowLeftRight, Repeat } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, ArrowLeftRight, Repeat, Scale } from "lucide-react";
 import { createTransaction } from "@/actions/transactions";
 import { createCategory } from "@/actions/categories";
 import { AmountInput } from "@/components/ui/amount-input";
@@ -51,7 +51,12 @@ export function TransactionForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<
-    "INCOME" | "EXPENSE" | "TRANSFER" | "P2P"
+    | "INCOME"
+    | "EXPENSE"
+    | "TRANSFER"
+    | "P2P"
+    | "ADJUSTMENT_IN"
+    | "ADJUSTMENT_OUT"
   >("EXPENSE");
   const [applyDigitalTax, setApplyDigitalTax] = useState(false);
 
@@ -65,6 +70,38 @@ export function TransactionForm({
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
+  const isAdjustment =
+    type === "ADJUSTMENT_IN" || type === "ADJUSTMENT_OUT";
+  const isIncomeLike = type === "INCOME" || type === "ADJUSTMENT_IN";
+  const tabValue = isAdjustment ? "ADJUSTMENT" : type;
+
+  function handleTabChange(value: string) {
+    if (value === "ADJUSTMENT") {
+      setType("ADJUSTMENT_OUT");
+      setSelectedCategoryId("");
+      return;
+    }
+    const nextType = value as typeof type;
+    const nextIsIncome =
+      nextType === "INCOME" || nextType === "ADJUSTMENT_IN";
+    if (
+      nextType === "TRANSFER" ||
+      nextType === "P2P" ||
+      nextIsIncome !== isIncomeLike
+    ) {
+      setSelectedCategoryId("");
+    }
+    setType(nextType);
+  }
+
+  function handleAdjustmentDirection(direction: "IN" | "OUT") {
+    const nextType =
+      direction === "IN" ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT";
+    if (nextType === type) return;
+    setType(nextType);
+    setSelectedCategoryId("");
+  }
+
   async function handleCreateCategory() {
     if (!newCategoryName.trim()) return;
 
@@ -73,7 +110,7 @@ export function TransactionForm({
 
     const formData = new FormData();
     formData.set("name", newCategoryName.trim());
-    formData.set("type", type === "INCOME" ? "INCOME" : "EXPENSE");
+    formData.set("type", isIncomeLike ? "INCOME" : "EXPENSE");
     formData.set("color", newCategoryColor);
 
     const result = await createCategory(formData);
@@ -85,7 +122,7 @@ export function TransactionForm({
     }
 
     if (result?.category) {
-      if (type === "INCOME") {
+      if (isIncomeLike) {
         setIncomeCategories([...incomeCategories, result.category]);
       } else {
         setExpenseCategories([...expenseCategories, result.category]);
@@ -117,7 +154,7 @@ export function TransactionForm({
     setOpen(false);
   }
 
-  const categories = type === "INCOME" ? incomeCategories : expenseCategories;
+  const categories = isIncomeLike ? incomeCategories : expenseCategories;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -131,12 +168,12 @@ export function TransactionForm({
         <SheetHeader>
           <SheetTitle>Add Transaction</SheetTitle>
           <SheetDescription>
-            Record income, expense, transfer, or P2P
+            Record income, expense, transfer, P2P, or adjustment
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs value={type} onValueChange={(v) => setType(v as typeof type)} className="px-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-4">
+        <Tabs value={tabValue} onValueChange={handleTabChange} className="px-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 mb-4">
             <TabsTrigger value="INCOME" className="gap-1">
               <TrendingUp className="h-4 w-4" />
               Income
@@ -152,6 +189,10 @@ export function TransactionForm({
             <TabsTrigger value="P2P" className="gap-1">
               <Repeat className="h-4 w-4" />
               P2P
+            </TabsTrigger>
+            <TabsTrigger value="ADJUSTMENT" className="gap-1">
+              <Scale className="h-4 w-4" />
+              Ajuste
             </TabsTrigger>
           </TabsList>
 
@@ -171,6 +212,26 @@ export function TransactionForm({
                 required
               />
             </div>
+
+            {isAdjustment && (
+              <div className="space-y-2">
+                <Label htmlFor="adjustmentDirection">Dirección del ajuste</Label>
+                <Select
+                  value={type === "ADJUSTMENT_IN" ? "IN" : "OUT"}
+                  onValueChange={(v) =>
+                    handleAdjustmentDirection(v as "IN" | "OUT")
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IN">Suma (a favor)</SelectItem>
+                    <SelectItem value="OUT">Resta (en contra)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="accountId">
@@ -208,7 +269,7 @@ export function TransactionForm({
               </div>
             )}
 
-            {type !== "TRANSFER" && (
+            {type !== "TRANSFER" && !isAdjustment && (
               <div className="space-y-2">
                 <Label htmlFor="categoryId">Category</Label>
                 <div className="flex gap-2">
@@ -246,7 +307,7 @@ export function TransactionForm({
                       <DialogHeader>
                         <DialogTitle>Nueva Categoria</DialogTitle>
                         <DialogDescription>
-                          Crear categoria de {type === "INCOME" ? "ingreso" : "gasto"}
+                          Crear categoria de {isIncomeLike ? "ingreso" : "gasto"}
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 pt-2">

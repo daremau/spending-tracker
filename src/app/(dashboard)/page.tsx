@@ -18,6 +18,7 @@ import {
   TrendingDown,
   ArrowRight,
   Repeat,
+  Scale,
   Plus,
 } from "lucide-react";
 
@@ -277,6 +278,8 @@ export default async function DashboardPage() {
                         ? "bg-red-100"
                         : transaction.type === "P2P"
                         ? "bg-indigo-100"
+                        : transaction.type.startsWith("ADJUSTMENT")
+                        ? "bg-amber-100"
                         : "bg-blue-100"
                     }`}
                   >
@@ -286,13 +289,18 @@ export default async function DashboardPage() {
                       <TrendingDown className="h-4 w-4 text-red-500" />
                     ) : transaction.type === "P2P" ? (
                       <Repeat className="h-4 w-4 text-indigo-500" />
+                    ) : transaction.type.startsWith("ADJUSTMENT") ? (
+                      <Scale className="h-4 w-4 text-amber-600" />
                     ) : (
                       <ArrowRight className="h-4 w-4 text-blue-500" />
                     )}
                   </div>
                   <div>
                     <p className="font-medium text-sm">
-                      {transaction.description || transaction.type}
+                      {transaction.description ||
+                        (transaction.type.startsWith("ADJUSTMENT")
+                          ? "Ajuste"
+                          : transaction.type)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {transaction.account.name}
@@ -307,12 +315,17 @@ export default async function DashboardPage() {
                       ? "text-red-500"
                       : transaction.type === "P2P"
                       ? "text-indigo-500"
+                      : transaction.type.startsWith("ADJUSTMENT")
+                      ? "text-amber-600"
                       : "text-blue-500"
                   }`}
                 >
-                  {transaction.type === "INCOME"
+                  {transaction.type === "INCOME" ||
+                  transaction.type === "ADJUSTMENT_IN"
                     ? "+"
-                    : transaction.type === "EXPENSE" || transaction.type === "P2P"
+                    : transaction.type === "EXPENSE" ||
+                      transaction.type === "P2P" ||
+                      transaction.type === "ADJUSTMENT_OUT"
                     ? "-"
                     : ""}
                   {formatCurrency(

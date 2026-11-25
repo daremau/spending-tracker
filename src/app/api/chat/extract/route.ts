@@ -125,7 +125,17 @@ export async function POST(req: Request) {
             : defaultAccountId && validAccountIds.has(defaultAccountId)
               ? defaultAccountId
               : null;
-      const type = d.type ?? (memApplies ? mem.type : null);
+      // Los ajustes no se generan desde el bot: si una regla vieja los tuviera,
+      // se ignoran para no romper el schema de drafts.
+      const memType =
+        mem &&
+        (mem.type === "INCOME" ||
+          mem.type === "EXPENSE" ||
+          mem.type === "TRANSFER" ||
+          mem.type === "P2P")
+          ? mem.type
+          : null;
+      const type = d.type ?? (memApplies ? memType : null);
       const resolved = Boolean(type && (categoryId || type === "TRANSFER") && accountId);
       return {
         ...d,

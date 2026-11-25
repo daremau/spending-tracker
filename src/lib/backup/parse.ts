@@ -16,7 +16,14 @@ export type ParsedBackup = {
   errors: string[];
 };
 
-const TRANSACTION_TYPES = new Set(["INCOME", "EXPENSE", "TRANSFER", "P2P"]);
+const TRANSACTION_TYPES = new Set([
+  "INCOME",
+  "EXPENSE",
+  "TRANSFER",
+  "P2P",
+  "ADJUSTMENT_IN",
+  "ADJUSTMENT_OUT",
+]);
 const CATEGORY_TYPES = new Set(["INCOME", "EXPENSE"]);
 const ASSET_TYPES = new Set(["STOCK", "ETF", "CRYPTO"]);
 const INVESTMENT_ACCOUNT_TYPES = new Set(["BROKERAGE", "EXCHANGE", "WALLET"]);
@@ -93,7 +100,13 @@ function buildFromSections(sections: CsvSections): ParsedBackup {
     if (!accountName) return;
 
     backup.transactions.push({
-      type: type as "INCOME" | "EXPENSE" | "TRANSFER" | "P2P",
+      type: type as
+        | "INCOME"
+        | "EXPENSE"
+        | "TRANSFER"
+        | "P2P"
+        | "ADJUSTMENT_IN"
+        | "ADJUSTMENT_OUT",
       amount: cell(row, 1) || "0",
       description: optionalCell(row, 2),
       date: toIsoDate(cell(row, 3)),

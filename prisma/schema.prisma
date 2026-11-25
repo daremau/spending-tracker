@@ -241,6 +241,8 @@ enum TransactionType {
   EXPENSE
   TRANSFER
   P2P
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
 }
 
 model ChatbotMemoryRule {

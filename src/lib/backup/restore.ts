@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { preflightBackup } from "./preflight";
-import { assetKey, type BackupDataV2 } from "./types";
+import { assetKey, categoryTypeForTransaction, type BackupDataV2 } from "./types";
 
 export type RestoreResult = {
   success: boolean;
@@ -131,9 +131,9 @@ export async function restoreBackup(
           if (!accountId) continue;
           const categoryId = transaction.categoryName
             ? (categoryIds.get(
-                `${lower(transaction.categoryName)}:${
-                  transaction.type === "INCOME" ? "INCOME" : "EXPENSE"
-                }`
+                `${lower(transaction.categoryName)}:${categoryTypeForTransaction(
+                  transaction.type
+                )}`
               ) ?? null)
             : null;
           const toAccountId = transaction.toAccountName

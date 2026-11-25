@@ -43,7 +43,13 @@ export type BackupCategory = {
 };
 
 export type BackupTransaction = {
-  type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
+  type:
+    | "INCOME"
+    | "EXPENSE"
+    | "TRANSFER"
+    | "P2P"
+    | "ADJUSTMENT_IN"
+    | "ADJUSTMENT_OUT";
   amount: string;
   description: string | null;
   date: string;
@@ -56,6 +62,18 @@ export type BackupTransaction = {
   /** Stable key used by children to point at this row. */
   key: string;
 };
+
+/**
+ * Category type used to resolve a transaction's category on backup restore.
+ * ADJUSTMENT_IN uses income categories; everything else uses expense ones.
+ */
+export function categoryTypeForTransaction(
+  type: BackupTransaction["type"]
+): "INCOME" | "EXPENSE" {
+  return type === "INCOME" || type === "ADJUSTMENT_IN"
+    ? "INCOME"
+    : "EXPENSE";
+}
 
 export type BackupExchangeRate = {
   fromCurrency: string;

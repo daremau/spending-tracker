@@ -6,7 +6,13 @@ import { normalizeMerchant } from "@/lib/chatbot/normalize";
 
 export type MemoryMatch = {
   merchantKey: string;
-  type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
+  type:
+    | "INCOME"
+    | "EXPENSE"
+    | "TRANSFER"
+    | "P2P"
+    | "ADJUSTMENT_IN"
+    | "ADJUSTMENT_OUT";
   categoryId: string | null;
   accountId: string | null;
   toAccountId: string | null;
@@ -53,7 +59,13 @@ export async function deleteMemoryRule(id: string) {
 /** Aprende/actualiza regla al confirmar o corregir un draft. */
 export async function learnMemoryRule(input: {
   merchant: string;
-  type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
+  type:
+    | "INCOME"
+    | "EXPENSE"
+    | "TRANSFER"
+    | "P2P"
+    | "ADJUSTMENT_IN"
+    | "ADJUSTMENT_OUT";
   categoryId?: string | null;
   accountId?: string | null;
   toAccountId?: string | null;

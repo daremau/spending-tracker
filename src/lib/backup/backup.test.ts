@@ -83,6 +83,30 @@ function fixture(): BackupDataV2 {
       isDigitalTax: false,
       parentKey: null,
     },
+    {
+      key: "t5",
+      type: "ADJUSTMENT_IN",
+      amount: "3000",
+      description: "Ajuste a favor",
+      date: "2026-06-03T00:00:00.000Z",
+      accountName: "Main PYG",
+      categoryName: null,
+      toAccountName: null,
+      isDigitalTax: false,
+      parentKey: null,
+    },
+    {
+      key: "t6",
+      type: "ADJUSTMENT_OUT",
+      amount: "1200.50",
+      description: "ajustar dif",
+      date: "2026-06-04T00:00:00.000Z",
+      accountName: "Main PYG",
+      categoryName: null,
+      toAccountName: null,
+      isDigitalTax: false,
+      parentKey: null,
+    },
   ];
 
   backup.exchangeRates = [

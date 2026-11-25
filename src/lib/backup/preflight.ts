@@ -4,7 +4,11 @@ import {
   replayLedger,
   type LedgerTransactionInput,
 } from "@/lib/portfolio/calculations";
-import { assetKey, type BackupDataV2 } from "./types";
+import {
+  assetKey,
+  categoryTypeForTransaction,
+  type BackupDataV2,
+} from "./types";
 
 const BackupDecimal = Decimal.clone({
   precision: 50,
@@ -150,9 +154,9 @@ export function preflightBackup(backup: BackupDataV2): PreflightResult {
     if (
       transaction.categoryName &&
       !categoryKeys.has(
-        `${transaction.categoryName.trim().toLowerCase()}:${
-          transaction.type === "INCOME" ? "INCOME" : "EXPENSE"
-        }`
+        `${transaction.categoryName.trim().toLowerCase()}:${categoryTypeForTransaction(
+          transaction.type
+        )}`
       )
     ) {
       errors.push(

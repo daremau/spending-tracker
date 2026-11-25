@@ -26,7 +26,7 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
   const { start, end } = resolveDateRange(filter, now);
   const dateFilter = start ? { gte: start, lte: end } : undefined;
 
-  const [spendingByCategory, incomeByCategory, categories, p2pAggregate] =
+  const [spendingByCategory, incomeByCategory, categories, flowAggregate] =
     await Promise.all([
       prisma.transaction.groupBy({
         by: ["categoryId"],
@@ -47,14 +47,23 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
       prisma.category.findMany({
         where: { type: { in: ["EXPENSE", "INCOME"] } },
       }),
-      prisma.transaction.aggregate({
+      prisma.transaction.groupBy({
+        by: ["type"],
         where: {
-          type: "P2P",
+          type: { in: ["P2P", "ADJUSTMENT_IN", "ADJUSTMENT_OUT"] },
           ...(dateFilter ? { date: dateFilter } : {}),
         },
         _sum: { amount: true },
       }),
     ]);
+
+  const flowTotals = new Map(
+    flowAggregate.map((row) => [row.type, Number(row._sum.amount) || 0])
+  );
+  const totalP2P = flowTotals.get("P2P") ?? 0;
+  const totalAdjustments =
+    (flowTotals.get("ADJUSTMENT_IN") ?? 0) -
+    (flowTotals.get("ADJUSTMENT_OUT") ?? 0);
 
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
@@ -186,7 +195,8 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
     pivot,
     totalIncome,
     totalExpense,
-    totalP2P: Number(p2pAggregate._sum.amount) || 0,
+    totalP2P,
+    totalAdjustments,
     netSavings: totalIncome - totalExpense,
     periodLabel: getPeriodLabel(filter, now),
   };
@@ -227,6 +237,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       totalIncome,
       totalExpense,
       totalP2P,
+      totalAdjustments,
       netSavings,
       periodLabel,
     },
@@ -271,7 +282,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         <Card>
           <CardContent className="p-3 text-center">
             <p className="text-xs text-muted-foreground">Income</p>
@@ -293,6 +304,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
             <p className="text-xs text-muted-foreground">P2P (no gasto)</p>
             <p className="text-sm font-semibold text-indigo-500">
               {formatCurrency(totalP2P)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
+            <p className="text-xs text-muted-foreground">Ajustes (neto)</p>
+            <p className="text-sm font-semibold text-amber-600">
+              {formatCurrency(totalAdjustments)}
             </p>
           </CardContent>
         </Card>
