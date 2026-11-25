@@ -8,7 +8,7 @@ import { confirmDraftSchema } from "@/lib/chatbot/schemas";
 import { learnMemoryRule } from "./chatbot-memory";
 import { getOrCreateDigitalTaxCategory } from "./categories";
 
-type TxType = "INCOME" | "EXPENSE" | "TRANSFER";
+type TxType = "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
 
 async function applyBalance(
   tx: Prisma.TransactionClient,
@@ -19,7 +19,7 @@ async function applyBalance(
       where: { id: data.accountId },
       data: { balance: { increment: data.amount } },
     });
-  } else if (data.type === "EXPENSE") {
+  } else if (data.type === "EXPENSE" || data.type === "P2P") {
     await tx.bankAccount.update({
       where: { id: data.accountId },
       data: { balance: { decrement: data.amount } },
@@ -93,14 +93,24 @@ export async function createChatbotTransactions(
   const categoryIds = Array.from(
     new Set(rows.map((r) => r.categoryId).filter((x): x is string => Boolean(x)))
   );
+  let categoryNames = new Map<string, string>();
   if (categoryIds.length > 0) {
     const cats = await prisma.category.findMany({
       where: { id: { in: categoryIds } },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (cats.length !== categoryIds.length) {
       return { error: "Hay una categoría inválida" };
     }
+    categoryNames = new Map(cats.map((c) => [c.id, c.name]));
+  }
+
+  // Una compra/venta P2P no es gasto: si el bot eligió una categoría P2P,
+  // forzamos el tipo para que no cuente en analíticas de gastos.
+  for (const r of rows) {
+    if (r.type !== "EXPENSE" || !r.categoryId) continue;
+    const name = categoryNames.get(r.categoryId)?.toLowerCase() ?? "";
+    if (name.includes("p2p")) r.type = "P2P";
   }
 
   const needsTax = rows.some((r) => r.applyDigitalTax && r.type === "EXPENSE");

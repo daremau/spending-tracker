@@ -18,6 +18,7 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowLeftRight,
+  Repeat,
 } from "lucide-react";
 import { deleteTransaction } from "@/actions/transactions";
 import { TransactionEditSheet } from "@/components/forms/transaction-edit-sheet";
@@ -33,7 +34,7 @@ interface Account {
 interface TransactionCardProps {
   transaction: {
     id: string;
-    type: "INCOME" | "EXPENSE" | "TRANSFER";
+    type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
     amount: number;
     description: string | null;
     date: Date;
@@ -99,6 +100,8 @@ export function TransactionCard({
         return <TrendingDown className="h-4 w-4 text-red-500" />;
       case "TRANSFER":
         return <ArrowLeftRight className="h-4 w-4 text-blue-500" />;
+      case "P2P":
+        return <Repeat className="h-4 w-4 text-indigo-500" />;
     }
   };
 
@@ -110,6 +113,8 @@ export function TransactionCard({
         return "text-red-500";
       case "TRANSFER":
         return "text-blue-500";
+      case "P2P":
+        return "text-indigo-500";
     }
   };
 
@@ -121,6 +126,8 @@ export function TransactionCard({
         return "-";
       case "TRANSFER":
         return "";
+      case "P2P":
+        return "-";
     }
   };
 
@@ -147,6 +154,14 @@ export function TransactionCard({
                     }}
                   >
                     {transaction.category.name}
+                  </Badge>
+                )}
+                {transaction.type === "P2P" && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs shrink-0 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                  >
+                    P2P
                   </Badge>
                 )}
                 {isDigitalTaxTransaction && (

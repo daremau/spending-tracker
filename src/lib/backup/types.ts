@@ -43,7 +43,7 @@ export type BackupCategory = {
 };
 
 export type BackupTransaction = {
-  type: "INCOME" | "EXPENSE" | "TRANSFER";
+  type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
   amount: string;
   description: string | null;
   date: string;

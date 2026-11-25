@@ -31,6 +31,7 @@ function fixture(): BackupDataV2 {
   backup.categories = [
     { name: "Salary", type: "INCOME", color: "#16a34a", icon: null },
     { name: 'Food, "dining"', type: "EXPENSE", color: "#dc2626", icon: "utensils" },
+    { name: "P2P Binance", type: "EXPENSE", color: "#6366f1", icon: null },
   ];
 
   backup.transactions = [
@@ -67,6 +68,18 @@ function fixture(): BackupDataV2 {
       accountName: "Main PYG",
       categoryName: null,
       toAccountName: "IBKR cash",
+      isDigitalTax: false,
+      parentKey: null,
+    },
+    {
+      key: "t4",
+      type: "P2P",
+      amount: "100000",
+      description: "Binance P2P",
+      date: "2026-06-02T00:00:00.000Z",
+      accountName: "Main PYG",
+      categoryName: "P2P Binance",
+      toAccountName: null,
       isDigitalTax: false,
       parentKey: null,
     },

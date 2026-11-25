@@ -19,7 +19,7 @@ export type UIDraft = {
   merchant: string;
   amount: number;
   date: string;
-  type: "INCOME" | "EXPENSE" | "TRANSFER" | null;
+  type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P" | null;
   categoryId: string | null;
   accountId: string | null;
   toAccountId: string | null;
@@ -123,6 +123,7 @@ export function DraftReviewTable({
                   <SelectItem value="EXPENSE">Gasto</SelectItem>
                   <SelectItem value="INCOME">Ingreso</SelectItem>
                   <SelectItem value="TRANSFER">Transfer</SelectItem>
+                  <SelectItem value="P2P">P2P</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -163,12 +164,18 @@ export function DraftReviewTable({
               ) : (
                 <Select
                   value={d.categoryId ?? ""}
-                  onValueChange={(v) =>
+                  onValueChange={(v) => {
+                    const category = cats.find((c) => c.id === v);
+                    const isP2P =
+                      category?.name.toLowerCase().includes("p2p") ?? false;
                     onChange(d.key, {
                       categoryId: v,
                       needsClarification: false,
-                    })
-                  }
+                      ...(isP2P && d.type !== "TRANSFER"
+                        ? { type: "P2P" as const }
+                        : {}),
+                    });
+                  }}
                 >
                   <SelectTrigger className="h-8">
                     <SelectValue placeholder="Categoría" />

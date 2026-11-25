@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 import { amountToNumber } from "@/lib/format";
 import { getOrCreateDigitalTaxCategory } from "./categories";
 
-type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER";
+type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
 
 const DIGITAL_TAX_RATE = 0.10; // 10%
 type TransactionBalanceData = {
@@ -56,7 +56,7 @@ async function applyTransactionBalance(
       where: { id: data.accountId },
       data: { balance: { increment: data.amount } },
     });
-  } else if (data.type === "EXPENSE") {
+  } else if (data.type === "EXPENSE" || data.type === "P2P") {
     await tx.bankAccount.update({
       where: { id: data.accountId },
       data: { balance: { decrement: data.amount } },
@@ -82,7 +82,7 @@ async function revertTransactionBalance(
       where: { id: data.accountId },
       data: { balance: { decrement: data.amount } },
     });
-  } else if (data.type === "EXPENSE") {
+  } else if (data.type === "EXPENSE" || data.type === "P2P") {
     await tx.bankAccount.update({
       where: { id: data.accountId },
       data: { balance: { increment: data.amount } },
@@ -429,6 +429,9 @@ export async function updateTransaction(formData: FormData) {
   }
 
   const existingTaxTransaction = transaction.taxTransaction;
+  // P2P no genera IVA Digital; si ya tenía uno asociado, se conserva para no
+  // borrar datos al editar la transacción.
+  const keepExistingTax = type === "P2P" && Boolean(existingTaxTransaction);
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // Revert main transaction balance
@@ -440,7 +443,7 @@ export async function updateTransaction(formData: FormData) {
     });
 
     // Revert existing tax transaction balance if it exists
-    if (existingTaxTransaction) {
+    if (existingTaxTransaction && !keepExistingTax) {
       await revertTransactionBalance(tx, {
         type: "EXPENSE",
         amount: Number(existingTaxTransaction.amount),

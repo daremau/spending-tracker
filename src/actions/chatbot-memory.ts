@@ -6,7 +6,7 @@ import { normalizeMerchant } from "@/lib/chatbot/normalize";
 
 export type MemoryMatch = {
   merchantKey: string;
-  type: "INCOME" | "EXPENSE" | "TRANSFER";
+  type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
   categoryId: string | null;
   accountId: string | null;
   toAccountId: string | null;
@@ -53,7 +53,7 @@ export async function deleteMemoryRule(id: string) {
 /** Aprende/actualiza regla al confirmar o corregir un draft. */
 export async function learnMemoryRule(input: {
   merchant: string;
-  type: "INCOME" | "EXPENSE" | "TRANSFER";
+  type: "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
   categoryId?: string | null;
   accountId?: string | null;
   toAccountId?: string | null;

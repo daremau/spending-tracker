@@ -26,27 +26,35 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
   const { start, end } = resolveDateRange(filter, now);
   const dateFilter = start ? { gte: start, lte: end } : undefined;
 
-  const [spendingByCategory, incomeByCategory, categories] = await Promise.all([
-    prisma.transaction.groupBy({
-      by: ["categoryId"],
-      where: {
-        type: "EXPENSE",
-        ...(dateFilter ? { date: dateFilter } : {}),
-      },
-      _sum: { amount: true },
-    }),
-    prisma.transaction.groupBy({
-      by: ["categoryId"],
-      where: {
-        type: "INCOME",
-        ...(dateFilter ? { date: dateFilter } : {}),
-      },
-      _sum: { amount: true },
-    }),
-    prisma.category.findMany({
-      where: { type: { in: ["EXPENSE", "INCOME"] } },
-    }),
-  ]);
+  const [spendingByCategory, incomeByCategory, categories, p2pAggregate] =
+    await Promise.all([
+      prisma.transaction.groupBy({
+        by: ["categoryId"],
+        where: {
+          type: "EXPENSE",
+          ...(dateFilter ? { date: dateFilter } : {}),
+        },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.groupBy({
+        by: ["categoryId"],
+        where: {
+          type: "INCOME",
+          ...(dateFilter ? { date: dateFilter } : {}),
+        },
+        _sum: { amount: true },
+      }),
+      prisma.category.findMany({
+        where: { type: { in: ["EXPENSE", "INCOME"] } },
+      }),
+      prisma.transaction.aggregate({
+        where: {
+          type: "P2P",
+          ...(dateFilter ? { date: dateFilter } : {}),
+        },
+        _sum: { amount: true },
+      }),
+    ]);
 
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
@@ -178,6 +186,7 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
     pivot,
     totalIncome,
     totalExpense,
+    totalP2P: Number(p2pAggregate._sum.amount) || 0,
     netSavings: totalIncome - totalExpense,
     periodLabel: getPeriodLabel(filter, now),
   };
@@ -217,6 +226,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       pivot,
       totalIncome,
       totalExpense,
+      totalP2P,
       netSavings,
       periodLabel,
     },
@@ -261,7 +271,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Card>
           <CardContent className="p-3 text-center">
             <p className="text-xs text-muted-foreground">Income</p>
@@ -275,6 +285,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
             <p className="text-xs text-muted-foreground">Expenses</p>
             <p className="text-sm font-semibold text-red-500">
               {formatCurrency(totalExpense)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
+            <p className="text-xs text-muted-foreground">P2P (no gasto)</p>
+            <p className="text-sm font-semibold text-indigo-500">
+              {formatCurrency(totalP2P)}
             </p>
           </CardContent>
         </Card>

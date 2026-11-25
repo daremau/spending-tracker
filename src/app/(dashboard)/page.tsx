@@ -17,6 +17,7 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowRight,
+  Repeat,
   Plus,
 } from "lucide-react";
 
@@ -274,6 +275,8 @@ export default async function DashboardPage() {
                         ? "bg-green-100"
                         : transaction.type === "EXPENSE"
                         ? "bg-red-100"
+                        : transaction.type === "P2P"
+                        ? "bg-indigo-100"
                         : "bg-blue-100"
                     }`}
                   >
@@ -281,6 +284,8 @@ export default async function DashboardPage() {
                       <TrendingUp className="h-4 w-4 text-green-600" />
                     ) : transaction.type === "EXPENSE" ? (
                       <TrendingDown className="h-4 w-4 text-red-500" />
+                    ) : transaction.type === "P2P" ? (
+                      <Repeat className="h-4 w-4 text-indigo-500" />
                     ) : (
                       <ArrowRight className="h-4 w-4 text-blue-500" />
                     )}
@@ -300,10 +305,16 @@ export default async function DashboardPage() {
                       ? "text-green-600"
                       : transaction.type === "EXPENSE"
                       ? "text-red-500"
+                      : transaction.type === "P2P"
+                      ? "text-indigo-500"
                       : "text-blue-500"
                   }`}
                 >
-                  {transaction.type === "INCOME" ? "+" : transaction.type === "EXPENSE" ? "-" : ""}
+                  {transaction.type === "INCOME"
+                    ? "+"
+                    : transaction.type === "EXPENSE" || transaction.type === "P2P"
+                    ? "-"
+                    : ""}
                   {formatCurrency(
                     Number(transaction.amount),
                     transaction.account.currency

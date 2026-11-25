@@ -6,7 +6,7 @@ export const draftTransactionSchema = z.object({
   date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "date debe ser YYYY-MM-DD"),
-  type: z.enum(["INCOME", "EXPENSE", "TRANSFER"]).nullable().optional(),
+  type: z.enum(["INCOME", "EXPENSE", "TRANSFER", "P2P"]).nullable().optional(),
   categoryId: z.string().nullable().optional(),
   categoryName: z.string().nullable().optional(),
   accountId: z.string().nullable().optional(),
@@ -27,7 +27,7 @@ export const extractResponseSchema = z.object({
 export type ExtractResponse = z.infer<typeof extractResponseSchema>;
 
 export const confirmDraftSchema = draftTransactionSchema.extend({
-  type: z.enum(["INCOME", "EXPENSE", "TRANSFER"]),
+  type: z.enum(["INCOME", "EXPENSE", "TRANSFER", "P2P"]),
 });
 
 export type ConfirmDraft = z.infer<typeof confirmDraftSchema>;

@@ -27,4 +27,14 @@ describe("confirmDraftSchema", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it("acepta P2P", () => {
+    const r = confirmDraftSchema.safeParse({
+      merchant: "Binance P2P",
+      amount: 100000,
+      date: "2026-09-07",
+      type: "P2P",
+    });
+    expect(r.success).toBe(true);
+  });
 });

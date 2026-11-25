@@ -20,12 +20,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
+import { Pencil, TrendingUp, TrendingDown, ArrowLeftRight, Repeat } from "lucide-react";
 import { updateTransaction } from "@/actions/transactions";
 import { AmountInput } from "@/components/ui/amount-input";
 import type { Category } from "@prisma/client";
 
-type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER";
+type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER" | "P2P";
 
 interface TransactionEditSheetProps {
   transaction: {
@@ -64,7 +64,9 @@ export function TransactionEditSheet({
   const [accountId, setAccountId] = useState(transaction.account.id);
   const [toAccountId, setToAccountId] = useState(transaction.toAccount?.id ?? "");
   const [categoryId, setCategoryId] = useState(transaction.category?.id ?? "");
-  const [applyDigitalTax, setApplyDigitalTax] = useState(!!transaction.taxTransaction);
+  const [applyDigitalTax, setApplyDigitalTax] = useState(
+    transaction.type === "EXPENSE" && !!transaction.taxTransaction
+  );
   const isOpen = typeof open === "boolean" ? open : uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
   const isDigitalTaxTransaction = transaction.isDigitalTax ?? false;
@@ -99,12 +101,16 @@ export function TransactionEditSheet({
 
   function handleTypeChange(value: string) {
     const nextType = value as TransactionType;
+    if (nextType === type) return;
     setType(nextType);
     if (nextType === "TRANSFER") {
       setCategoryId("");
     } else {
       setToAccountId("");
-      setCategoryId("");
+      // INCOME usa otro set de categorías: solo limpiar al cruzar ese límite.
+      if ((nextType === "INCOME") !== (type === "INCOME")) {
+        setCategoryId("");
+      }
     }
   }
 
@@ -132,7 +138,7 @@ export function TransactionEditSheet({
         </SheetHeader>
 
         <Tabs value={type} onValueChange={handleTypeChange} className="px-4">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-4">
             <TabsTrigger value="INCOME" className="gap-1">
               <TrendingUp className="h-4 w-4" />
               Income
@@ -144,6 +150,10 @@ export function TransactionEditSheet({
             <TabsTrigger value="TRANSFER" className="gap-1">
               <ArrowLeftRight className="h-4 w-4" />
               Transfer
+            </TabsTrigger>
+            <TabsTrigger value="P2P" className="gap-1">
+              <Repeat className="h-4 w-4" />
+              P2P
             </TabsTrigger>
           </TabsList>
 

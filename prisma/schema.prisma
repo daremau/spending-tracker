@@ -240,6 +240,7 @@ enum TransactionType {
   INCOME
   EXPENSE
   TRANSFER
+  P2P
 }
 
 model ChatbotMemoryRule {

@@ -28,7 +28,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, ArrowLeftRight, Repeat } from "lucide-react";
 import { createTransaction } from "@/actions/transactions";
 import { createCategory } from "@/actions/categories";
 import { AmountInput } from "@/components/ui/amount-input";
@@ -50,7 +50,9 @@ export function TransactionForm({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState<"INCOME" | "EXPENSE" | "TRANSFER">("EXPENSE");
+  const [type, setType] = useState<
+    "INCOME" | "EXPENSE" | "TRANSFER" | "P2P"
+  >("EXPENSE");
   const [applyDigitalTax, setApplyDigitalTax] = useState(false);
 
   // Category state
@@ -71,7 +73,7 @@ export function TransactionForm({
 
     const formData = new FormData();
     formData.set("name", newCategoryName.trim());
-    formData.set("type", type);
+    formData.set("type", type === "INCOME" ? "INCOME" : "EXPENSE");
     formData.set("color", newCategoryColor);
 
     const result = await createCategory(formData);
@@ -129,12 +131,12 @@ export function TransactionForm({
         <SheetHeader>
           <SheetTitle>Add Transaction</SheetTitle>
           <SheetDescription>
-            Record income, expense, or transfer
+            Record income, expense, transfer, or P2P
           </SheetDescription>
         </SheetHeader>
 
         <Tabs value={type} onValueChange={(v) => setType(v as typeof type)} className="px-4">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-4">
             <TabsTrigger value="INCOME" className="gap-1">
               <TrendingUp className="h-4 w-4" />
               Income
@@ -146,6 +148,10 @@ export function TransactionForm({
             <TabsTrigger value="TRANSFER" className="gap-1">
               <ArrowLeftRight className="h-4 w-4" />
               Transfer
+            </TabsTrigger>
+            <TabsTrigger value="P2P" className="gap-1">
+              <Repeat className="h-4 w-4" />
+              P2P
             </TabsTrigger>
           </TabsList>
 
