@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getChatbotCredentials } from "@/actions/chatbot-settings";
 import { findMemoryMatches } from "@/actions/chatbot-memory";
@@ -23,6 +24,16 @@ const bodySchema = z.object({
     .default([]),
   defaultAccountId: z.string().nullable().optional(),
 });
+
+/**
+ * OpenCode Go pide un session id estable por conversación (routing/caching).
+ * El cliente lo manda en `x-chat-session`; si falta, generamos uno.
+ */
+function chatSessionId(req: Request): string {
+  const raw = req.headers.get("x-chat-session") ?? "";
+  const clean = raw.replace(/[^A-Za-z0-9._:-]/g, "").slice(0, 128);
+  return clean || randomUUID();
+}
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -82,7 +93,8 @@ export async function POST(req: Request) {
       creds,
       system,
       text,
-      images
+      images,
+      chatSessionId(req)
     );
 
     // Merge con memoria: si el LLM duda y hay regla, autocompleta.

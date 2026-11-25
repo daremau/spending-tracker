@@ -16,12 +16,20 @@ function toImageParts(images: ChatImage[]) {
   }));
 }
 
+/**
+ * OpenCode Go exige `x-opencode-session` para enrutar/cachear y un User-Agent
+ * propio en vez de uno genérico. Otros proveedores OpenAI-compatibles ignoran
+ * estos headers.
+ */
+const CLIENT_UA = "spending-tracker/1.0";
+
 async function callOnce(
   creds: Pick<ProviderCredentials, "apiKey" | "baseUrl">,
   model: string,
   system: string,
   text: string,
-  images: ChatImage[]
+  images: ChatImage[],
+  sessionId: string
 ): Promise<ExtractResponse> {
   // Imágenes antes que el texto (best practice multimodal: ej. Gemma).
   const userContent: unknown[] = [...toImageParts(images)];
@@ -33,6 +41,8 @@ async function callOnce(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${creds.apiKey}`,
+      "User-Agent": CLIENT_UA,
+      "x-opencode-session": sessionId,
     },
     body: JSON.stringify({
       model,
@@ -110,11 +120,19 @@ export async function extractWithFallback(
   creds: ProviderCredentials,
   system: string,
   text: string,
-  images: ChatImage[]
+  images: ChatImage[],
+  sessionId = "spending-tracker"
 ): Promise<{ result: ExtractResponse; model: string; degraded: boolean }> {
   let primaryError: unknown = null;
   try {
-    const result = await callOnce(creds, creds.model, system, text, images);
+    const result = await callOnce(
+      creds,
+      creds.model,
+      system,
+      text,
+      images,
+      sessionId
+    );
     return { result, model: creds.model, degraded: false };
   } catch (e) {
     primaryError = e;
@@ -130,7 +148,7 @@ export async function extractWithFallback(
   }
   try {
     // Sin imágenes: el fallback de texto las rechazaría con 400.
-    const result = await callOnce(creds, fallback, system, text, []);
+    const result = await callOnce(creds, fallback, system, text, [], sessionId);
     return { result, model: fallback, degraded: images.length > 0 };
   } catch (fallbackError) {
     // Encadena ambos errores para no tapar la causa real del primario.

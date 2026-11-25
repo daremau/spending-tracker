@@ -11,9 +11,11 @@ import {
 const SETTINGS_ID = "singleton";
 
 const DEFAULT_BASE_URL =
-  process.env.CHATBOT_BASE_URL ?? "https://ollama.com/v1";
-const DEFAULT_MODEL = process.env.CHATBOT_MODEL ?? "gemma4:31b-cloud";
-const DEFAULT_FALLBACK = process.env.CHATBOT_FALLBACK_MODEL ?? "gemma4:cloud";
+  process.env.CHATBOT_BASE_URL ??
+  "https://opencode.ai/inference/go/openai/v1";
+const DEFAULT_MODEL = process.env.CHATBOT_MODEL ?? "deepseek-v4.1-flash";
+const DEFAULT_FALLBACK =
+  process.env.CHATBOT_FALLBACK_MODEL ?? "glm-5.3-flash";
 
 async function ensureChatbotSettings() {
   return prisma.chatbotSettings.upsert({

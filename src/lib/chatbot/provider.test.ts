@@ -26,9 +26,9 @@ function fail(status: number, msg: string) {
 
 const creds = {
   apiKey: "k",
-  baseUrl: "https://ollama.com/v1",
-  model: "gemma4:31b-cloud",
-  fallbackModel: "gemma4:cloud",
+  baseUrl: "https://opencode.ai/inference/go/openai/v1",
+  model: "deepseek-v4.1-flash",
+  fallbackModel: "glm-5.3-flash",
 };
 
 describe("safeJsonParse", () => {
@@ -60,9 +60,21 @@ describe("extractWithFallback", () => {
     const fetch = vi.fn(async () => okDrafts());
     vi.stubGlobal("fetch", fetch);
     const r = await extractWithFallback(creds, "sys", "Biggie 45000", []);
-    expect(r.model).toBe("gemma4:31b-cloud");
+    expect(r.model).toBe("deepseek-v4.1-flash");
     expect(r.degraded).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("manda sesión de OpenCode Go y User-Agent propio", async () => {
+    const fetch = vi.fn(async () => okDrafts());
+    vi.stubGlobal("fetch", fetch);
+    await extractWithFallback(creds, "sys", "Biggie 45000", [], "ses-123");
+    const call = fetch.mock.calls[0] as unknown as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(call[1].headers["x-opencode-session"]).toBe("ses-123");
+    expect(call[1].headers["User-Agent"]).toBe("spending-tracker/1.0");
   });
 
   it("cae al fallback en texto plano sin degraded", async () => {
@@ -70,7 +82,7 @@ describe("extractWithFallback", () => {
     fetch.mockRejectedValueOnce(new Error("caído"));
     vi.stubGlobal("fetch", fetch);
     const r = await extractWithFallback(creds, "sys", "Biggie 45000", []);
-    expect(r.model).toBe("gemma4:cloud");
+    expect(r.model).toBe("glm-5.3-flash");
     expect(r.degraded).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -82,7 +94,7 @@ describe("extractWithFallback", () => {
     const r = await extractWithFallback(creds, "sys", "Biggie 45000", [
       { dataUrl: "data:image/jpeg;base64,xxx" },
     ]);
-    expect(r.model).toBe("gemma4:cloud");
+    expect(r.model).toBe("glm-5.3-flash");
     expect(r.degraded).toBe(true);
     expect(fetch).toHaveBeenCalledTimes(2);
     const secondCall = fetch.mock.calls[1] as unknown as [

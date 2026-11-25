@@ -58,7 +58,7 @@ export function ChatbotSettingsForm({ status }: { status: ChatbotStatus }) {
   }
 
   async function handleReset() {
-    if (!confirm("¿Volver a los defaults de Ollama Cloud? (conserva tu key)"))
+    if (!confirm("¿Volver a los defaults de OpenCode? (conserva tu key)"))
       return;
     setLoading(true);
     await resetChatbotDefaults();
@@ -87,8 +87,9 @@ export function ChatbotSettingsForm({ status }: { status: ChatbotStatus }) {
     >
       <div className="font-medium">Configurar chatbot IA</div>
       <p className="text-xs text-muted-foreground">
-        Usa tu API key de Ollama Cloud (creala en ollama.com/settings/keys).
-        Se guarda cifrada en el servidor, nunca en el navegador.
+        Usa tu API key de OpenCode Console (opencode.ai/console). Con plan Go
+        usá el Base URL de Go; con créditos pay-as-you-go, el de OpenCode
+        Models. Se guarda cifrada en el servidor, nunca en el navegador.
       </p>
       {error && (
         <div className="rounded-md bg-red-50 p-2 text-xs text-red-600 dark:bg-red-950">
@@ -106,7 +107,7 @@ export function ChatbotSettingsForm({ status }: { status: ChatbotStatus }) {
           id="providerBaseUrl"
           name="providerBaseUrl"
           defaultValue={status.providerBaseUrl}
-          placeholder="https://ollama.com/v1"
+          placeholder="https://opencode.ai/inference/go/openai/v1"
         />
       </div>
       <div className="grid grid-cols-2 gap-2">

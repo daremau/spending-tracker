@@ -65,6 +65,20 @@ export function Chatbot({
   const [error, setError] = useState<string | null>(null);
   const [lastCount, setLastCount] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const sessionRef = useRef<string | null>(null);
+
+  /** Id estable por conversación para OpenCode Go (routing/caching). */
+  function chatSessionId() {
+    if (!sessionRef.current) {
+      sessionRef.current =
+        typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `st-${Date.now().toString(36)}-${Math.random()
+              .toString(36)
+              .slice(2, 10)}`;
+    }
+    return sessionRef.current;
+  }
 
   function patchDraft(key: string, patch: Partial<UIDraft>) {
     setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
@@ -86,6 +100,7 @@ export function Chatbot({
     setDrafts([]);
     setError(null);
     setLastCount(null);
+    sessionRef.current = null;
   }
 
   async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -119,7 +134,10 @@ export function Chatbot({
     try {
       const res = await fetch("/api/chat/extract", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-chat-session": chatSessionId(),
+        },
         body: JSON.stringify({
           text: userText,
           images: images.map((dataUrl) => ({ dataUrl })),
