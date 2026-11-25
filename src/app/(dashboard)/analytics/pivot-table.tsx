@@ -12,6 +12,7 @@ interface PivotTableProps {
   months: string[];
   income: PivotRow[];
   expense: PivotRow[];
+  p2p: PivotRow[];
   periodLabel: string;
 }
 
@@ -30,11 +31,20 @@ const fullFormat = new Intl.NumberFormat("es-PY", {
 const compact = (value: number) =>
   value === 0 ? "—" : compactFormat.format(value);
 
-function cellStyle(value: number, max: number, type: "income" | "expense") {
+function cellStyle(
+  value: number,
+  max: number,
+  type: "income" | "expense" | "p2p"
+) {
   if (value <= 0 || max <= 0) return undefined;
   const intensity = Math.min(value / max, 1);
   const alpha = 0.1 + intensity * 0.55;
-  const rgb = type === "income" ? "34, 197, 94" : "239, 68, 68";
+  const rgb =
+    type === "income"
+      ? "34, 197, 94"
+      : type === "p2p"
+        ? "99, 102, 241"
+        : "239, 68, 68";
   return { backgroundColor: `rgba(${rgb}, ${alpha})` };
 }
 
@@ -54,12 +64,16 @@ export function PivotTable({
   months,
   income,
   expense,
+  p2p,
   periodLabel,
 }: PivotTableProps) {
-  const hasData = months.length > 0 && (income.length > 0 || expense.length > 0);
+  const hasData =
+    months.length > 0 &&
+    (income.length > 0 || expense.length > 0 || p2p.length > 0);
 
   const incomeTotals = columnTotals(income, months.length);
   const expenseTotals = columnTotals(expense, months.length);
+  const p2pTotals = columnTotals(p2p, months.length);
 
   const maxIncomeCell = Math.max(
     1,
@@ -68,6 +82,10 @@ export function PivotTable({
   const maxExpenseCell = Math.max(
     1,
     ...expense.flatMap((r) => r.values)
+  );
+  const maxP2PCell = Math.max(
+    1,
+    ...p2p.flatMap((r) => r.values)
   );
 
   const net = months.map(
@@ -87,7 +105,7 @@ export function PivotTable({
     rows: PivotRow[],
     totals: ReturnType<typeof columnTotals>,
     max: number,
-    type: "income" | "expense"
+    type: "income" | "expense" | "p2p"
   ) => (
     <>
       <tr className="bg-muted/50">
@@ -145,7 +163,9 @@ export function PivotTable({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Income & Expense Sheet</CardTitle>
+        <CardTitle className="text-base">
+          Income, Expense &amp; P2P Sheet
+        </CardTitle>
         <p className="text-xs text-muted-foreground">
           {periodLabel} · category × month
         </p>
@@ -179,6 +199,8 @@ export function PivotTable({
                   renderSection("Income", income, incomeTotals, maxIncomeCell, "income")}
                 {expense.length > 0 &&
                   renderSection("Expenses", expense, expenseTotals, maxExpenseCell, "expense")}
+                {p2p.length > 0 &&
+                  renderSection("P2P", p2p, p2pTotals, maxP2PCell, "p2p")}
 
                 <tr className="border-t-2 font-bold">
                   <td className={stickyCol}>Net</td>

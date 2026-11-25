@@ -93,7 +93,7 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
 
   const transactions = await prisma.transaction.findMany({
     where: {
-      type: { in: ["INCOME", "EXPENSE"] },
+      type: { in: ["INCOME", "EXPENSE", "P2P"] },
       ...(dateFilter ? { date: dateFilter } : {}),
     },
     select: {
@@ -133,7 +133,7 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
       if (month) {
         if (t.type === "INCOME") {
           month.income += Number(t.amount);
-        } else {
+        } else if (t.type === "EXPENSE") {
           month.expense += Number(t.amount);
         }
       }
@@ -148,24 +148,39 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
   }
 
   // Pivot matrix: categories (rows) x months (columns), one section per type
-  const buildPivotRows = (type: "INCOME" | "EXPENSE"): PivotRow[] => {
+  const buildPivotRows = (
+    type: "INCOME" | "EXPENSE" | "P2P"
+  ): PivotRow[] => {
     const byCategory = new Map<string, Map<string, number>>();
     transactions.forEach((t) => {
-      if (t.type !== type || !t.categoryId) return;
+      if (t.type !== type) return;
+      // Las transferencias P2P sin categoría se agrupan aparte.
+      if (!t.categoryId && type !== "P2P") return;
+      const categoryKey = t.categoryId ?? "__none__";
       const monthKey = format(startOfMonth(new Date(t.date)), "MMM yy");
-      if (!byCategory.has(t.categoryId)) byCategory.set(t.categoryId, new Map());
-      const row = byCategory.get(t.categoryId)!;
+      if (!byCategory.has(categoryKey)) byCategory.set(categoryKey, new Map());
+      const row = byCategory.get(categoryKey)!;
       row.set(monthKey, (row.get(monthKey) ?? 0) + Number(t.amount));
     });
 
     return Array.from(byCategory.entries())
       .map(([categoryId, row]) => {
         const category = categoryMap.get(categoryId);
+        const uncategorized = categoryId === "__none__";
         const values = monthOrder.map((month) => row.get(month) ?? 0);
         const total = values.reduce((sum, v) => sum + v, 0);
         return {
-          name: category?.name || "Unknown",
-          color: category?.color || (type === "INCOME" ? "#22c55e" : "#ef4444"),
+          name: uncategorized
+            ? "Sin categoría"
+            : category?.name || "Unknown",
+          color: uncategorized
+            ? "#94a3b8"
+            : category?.color ||
+              (type === "INCOME"
+                ? "#22c55e"
+                : type === "P2P"
+                  ? "#6366f1"
+                  : "#ef4444"),
           values,
           total,
           average: monthOrder.length > 0 ? total / monthOrder.length : 0,
@@ -178,6 +193,7 @@ async function getAnalyticsData(filter: AnalyticsFilter) {
     months: monthOrder,
     income: buildPivotRows("INCOME"),
     expense: buildPivotRows("EXPENSE"),
+    p2p: buildPivotRows("P2P"),
   };
 
   const totalIncome = transactions
@@ -403,6 +419,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         months={pivot.months}
         income={pivot.income}
         expense={pivot.expense}
+        p2p={pivot.p2p}
         periodLabel={periodLabel}
       />
 
